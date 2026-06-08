@@ -112,9 +112,17 @@ export default function Multiplayer({ onShowNotification }) {
     }
   }, []);
 
+  useEffect(() => {
+    if (!activeSession?.session?.id) return undefined;
 
+    const sessionId = activeSession.session.id;
+    const timer = setInterval(() => {
+      syncSessionState(sessionId);
+      loadOverview();
+    }, 2500);
 
-
+    return () => clearInterval(timer);
+  }, [activeSession?.session?.id, loadOverview, syncSessionState]);
 
 
 
@@ -200,26 +208,28 @@ export default function Multiplayer({ onShowNotification }) {
       notify('Комната удалена', 'accent');
     };
 
-    const handleOverviewUpdated = () => {};
+    const handleOverviewUpdated = () => {
+      loadOverview();
+    };
 
     socket.on('multiplayer:invite', handleInvite);
-    socket.on('multiplayer:sessionUpdated', () => {});
-    socket.on('multiplayer:sessionState', () => {});
+    socket.on('multiplayer:sessionUpdated', handleSessionUpdated);
+    socket.on('multiplayer:sessionState', handleSessionState);
     socket.on('multiplayer:sessionFinished', handleFinished);
     socket.on('multiplayer:sessionDeleted', handleSessionDeleted);
     socket.on('multiplayer:overviewUpdated', handleOverviewUpdated);
-    socket.on('multiplayer:roundResult', () => {});
-    socket.on('multiplayer:roundStarted', () => {});
+    socket.on('multiplayer:roundResult', handleRoundResult);
+    socket.on('multiplayer:roundStarted', handleRoundStarted);
 
     return () => {
       socket.off('multiplayer:invite', handleInvite);
-      socket.off('multiplayer:sessionUpdated', () => {});
-      socket.off('multiplayer:sessionState', () => {});
+      socket.off('multiplayer:sessionUpdated', handleSessionUpdated);
+      socket.off('multiplayer:sessionState', handleSessionState);
       socket.off('multiplayer:sessionFinished', handleFinished);
       socket.off('multiplayer:sessionDeleted', handleSessionDeleted);
       socket.off('multiplayer:overviewUpdated', handleOverviewUpdated);
-      socket.off('multiplayer:roundResult', () => {});
-      socket.off('multiplayer:roundStarted', () => {});
+      socket.off('multiplayer:roundResult', handleRoundResult);
+      socket.off('multiplayer:roundStarted', handleRoundStarted);
 
       if (socket !== window.multiplayerSocket) {
         socket.disconnect();
