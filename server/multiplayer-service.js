@@ -772,6 +772,16 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
                 console.log('Failed to sync user');
                 return res.status(500).json({ error: 'Не удалось синхронизировать пользователя' });
             }
+
+            const existingSessionsResult = await mpPool.query(
+                `SELECT COUNT(*) FROM multiplayer_sessions 
+                 WHERE host_user_id = $1 AND status IN ('waiting', 'active')`,
+                [req.user.id]
+            );
+            if (Number(existingSessionsResult.rows[0].count) >= 5) {
+                return res.status(400).json({ error: 'Максимум 5 активных сессий' });
+            }
+
             const deckData = await syncDeck(mpPool, deckId, req.headers.authorization.split(' ')[1]);
             if (!deckData) {
                 console.log('Failed to sync deck');
