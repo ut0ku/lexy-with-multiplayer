@@ -498,6 +498,15 @@ async function registerMultiplayer({ app, pool, io, authenticateToken, connected
                 return res.status(400).json({ error: 'Не выбрана колода' });
             }
 
+            const existingSessionsResult = await client.query(
+                `SELECT COUNT(*) AS cnt FROM multiplayer_sessions 
+                 WHERE host_user_id = $1 AND status IN ('waiting', 'active')`,
+                [req.user.id]
+            );
+            if (parseInt(existingSessionsResult.rows[0].cnt, 10) >= 5) {
+                return res.status(400).json({ error: 'Максимум 5 активных сессий' });
+            }
+
             const deckAccess = await client.query(
                 `SELECT d.id, d.name
                  FROM user_decks ud

@@ -774,11 +774,11 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
             }
 
             const existingSessionsResult = await mpPool.query(
-                `SELECT COUNT(*) FROM multiplayer_sessions 
+                `SELECT COUNT(*) AS cnt FROM multiplayer_sessions 
                  WHERE host_user_id = $1 AND status IN ('waiting', 'active')`,
                 [req.user.id]
             );
-            if (Number(existingSessionsResult.rows[0].count) >= 5) {
+            if (parseInt(existingSessionsResult.rows[0].cnt, 10) >= 5) {
                 return res.status(400).json({ error: 'Максимум 5 активных сессий' });
             }
 
