@@ -33,6 +33,7 @@ export default function Multiplayer({ onShowNotification }) {
   const [activeSession, setActiveSession] = useState(null);
   const [selectedDeckId, setSelectedDeckId] = useState('');
   const [mode, setMode] = useState('competitive');
+  const [inputMode, setInputMode] = useState('buttons');
   const [joinCode, setJoinCode] = useState('');
 
   const [answerValue, setAnswerValue] = useState('');
@@ -259,7 +260,7 @@ export default function Multiplayer({ onShowNotification }) {
 
     try {
       setSubmitting(true);
-      const result = await api.multiplayer.createSession(selectedDeckId, mode, 'buttons');
+      const result = await api.multiplayer.createSession(selectedDeckId, mode, inputMode);
       const sessionPayload = result.session;
       if (sessionPayload?.session?.id) {
         setActiveSession(sessionPayload);
@@ -670,6 +671,13 @@ export default function Multiplayer({ onShowNotification }) {
                 <option value="competitive">Соревновательный</option>
               </select>
             </label>
+            <label>
+              Ответ
+              <select value={inputMode} onChange={(event) => setInputMode(event.target.value)}>
+                <option value="buttons">Знаю / не знаю</option>
+                <option value="text">Ввод с клавиатуры</option>
+              </select>
+            </label>
             <button className="btn-primary" type="submit" disabled={submitting}>
               Создать сессию
             </button>
@@ -696,6 +704,7 @@ export default function Multiplayer({ onShowNotification }) {
               <div className="session-meta">
                 <span>Код: {session?.code}</span>
                 <span>Режим: {session?.mode === 'competitive' ? 'соревновательный' : 'совместный'}</span>
+                <span>Ответ: {session?.inputMode === 'text' ? 'клавиатура' : 'кнопки'}</span>
                 <span>Статус: {session?.status}</span>
               </div>
 
