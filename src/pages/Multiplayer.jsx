@@ -219,35 +219,10 @@ if (data?.session) {
       loadStoredSession();
     };
 
-    document.body.classList.add('dark-theme');
-    document.body.classList.remove('light-theme');
-
-    const enforceDarkTheme = () => {
-      document.body.classList.add('dark-theme');
-      document.body.classList.remove('light-theme');
-      const themeToggle = document.getElementById('themeToggle');
-      if (themeToggle) {
-        themeToggle.checked = false;
-      }
-    };
-
-    enforceDarkTheme();
-
     return () => {
       mounted = false;
     };
   }, [loadDecks, loadOverview, loadStoredSession]);
-
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      if (document.body.classList.contains('light-theme')) {
-        document.body.classList.remove('light-theme');
-        document.body.classList.add('dark-theme');
-      }
-    });
-    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
 
   const handleCreateSession = async (event) => {
     event.preventDefault();

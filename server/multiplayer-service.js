@@ -321,6 +321,7 @@ async function fetchDecksByIds(mpPool, deckIds) {
     return new Map(result.rows.map((row) => [Number(row.id), row]));
 }
 
+// Resolve synced deck data
 async function fetchOwnedDeck(mpPool, userId, deckId) {
     const deck = await fetchDeck(mpPool, deckId);
     return deck ? { id: deck.id, name: deck.name } : null;

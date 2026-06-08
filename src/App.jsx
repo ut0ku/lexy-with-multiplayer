@@ -13,6 +13,22 @@ import { io } from 'socket.io-client';
 
 const MULTIPLAYER_SOCKET_URL = import.meta.env.VITE_MULTIPLAYER_SOCKET_URL || 'http://localhost:3003';
 
+function getStoredTheme() {
+  const userStr = localStorage.getItem('lexy_user');
+  if (userStr) {
+    try {
+      const localUser = JSON.parse(userStr);
+      if (localUser?.theme === 'light' || localUser?.theme === 'dark') {
+        return localUser.theme;
+      }
+    } catch (e) {}
+  }
+  if (window.AppState?.user?.theme === 'light' || window.AppState?.user?.theme === 'dark') {
+    return window.AppState.user.theme;
+  }
+  return 'dark';
+}
+
 function App() {
   const [userDecks, setUserDecks] = useState([]);
   const [currentPage, setCurrentPage] = useState('home');
@@ -134,8 +150,9 @@ const loadPage = useCallback(async (pageName) => {
     setCurrentPage(pageName);
 
     if (pageName === 'multiplayer') {
-      document.body.classList.add('dark-theme');
-      document.body.classList.remove('light-theme');
+      const stored = getStoredTheme();
+      document.body.classList.remove('dark-theme', 'light-theme');
+      document.body.classList.add(stored === 'light' ? 'light-theme' : 'dark-theme');
     }
 
     if (pageName === 'home' && window.initHomePage) {
@@ -379,36 +396,6 @@ const loadPage = useCallback(async (pageName) => {
   useEffect(() => {
     loadAppState();
 
-const applyStoredTheme = () => {
-      let storedTheme = 'dark';
-
-      const userStr = localStorage.getItem('lexy_user');
-      if (userStr) {
-        try {
-          const localUser = JSON.parse(userStr);
-          if (localUser?.theme === 'light' || localUser?.theme === 'dark') {
-            storedTheme = localUser.theme;
-          }
-        } catch (e) {
-
-        }
-      }
-
-      if (window.AppState?.user?.theme === 'light' || window.AppState?.user?.theme === 'dark') {
-        storedTheme = window.AppState.user.theme;
-      }
-
-      if (storedTheme === 'light' && currentPage !== 'multiplayer') {
-        document.body.classList.add('light-theme');
-        document.body.classList.remove('dark-theme');
-      } else {
-        document.body.classList.add('dark-theme');
-        document.body.classList.remove('light-theme');
-      }
-    };
-
-    applyStoredTheme();
-
     const init = async () => {
       loadingHideTimerRef.current = setTimeout(() => {
         setIsLoadingHidden(true);
@@ -531,29 +518,6 @@ const applyStoredTheme = () => {
       window.subscribeUserToPush = null;
     };
 }, [loadPage, initNavbarScrollEffect, subscribeUserToPush, showNotification]);
-
-  useEffect(() => {
-    const userStr = localStorage.getItem('lexy_user');
-    let storedTheme = 'dark';
-    if (userStr) {
-      try {
-        const localUser = JSON.parse(userStr);
-        if (localUser?.theme === 'light' || localUser?.theme === 'dark') {
-          storedTheme = localUser.theme;
-        }
-      } catch (e) {}
-    }
-    if (window.AppState?.user?.theme === 'light' || window.AppState?.user?.theme === 'dark') {
-      storedTheme = window.AppState.user.theme;
-    }
-    if (storedTheme === 'light' && currentPage !== 'multiplayer') {
-      document.body.classList.add('light-theme');
-      document.body.classList.remove('dark-theme');
-    } else if (currentPage !== 'multiplayer') {
-      document.body.classList.add('dark-theme');
-      document.body.classList.remove('light-theme');
-    }
-  }, [currentPage]);
 
   const renderPage = () => {
     switch (currentPage) {
