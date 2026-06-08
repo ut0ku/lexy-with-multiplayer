@@ -581,7 +581,7 @@ const handleRoundResult = (payload) => {
             Создавайте комнаты, приглашайте по логину или коду, проходите карточки синхронно и сравнивайте результат после каждого ответа.
           </p>
         </div>
-        <div className="multiplayer-stat-strip" style={{ alignItems: 'flex-start', marginTop: '-8px' }}>
+        <div className="multiplayer-stat-strip">
           <div>
             <span>Побед</span>
             <strong>{overview.me?.wins || 0}</strong>
@@ -599,7 +599,7 @@ const handleRoundResult = (payload) => {
           <form className="multiplayer-form" onSubmit={handleCreateSession}>
             <label>
               Колода
-              <select value={selectedDeckId} onChange={(event) => setSelectedDeckId(event.target.value)} style={{ marginLeft: '4px' }}>
+              <select value={selectedDeckId} onChange={(event) => setSelectedDeckId(event.target.value)}>
                 <option value="">Выберите колоду</option>
                 {availableDecks.map((deck) =>
                 <option key={deck.id} value={deck.id}>
@@ -615,13 +615,13 @@ const handleRoundResult = (payload) => {
         </section>
 
         <section className="multiplayer-card">
-          <h2 style={{ marginLeft: '3px' }}>Подключиться по коду</h2>
+          <h2>Подключиться по коду</h2>
           <form className="multiplayer-form" onSubmit={handleJoinByCode}>
             <label>
               Код комнаты
-              <input value={joinCode} onChange={(event) => setJoinCode(event.target.value)} placeholder="Например, A1B2C3" style={{ marginTop: '12px', marginLeft: '-4px' }} />
+              <input value={joinCode} onChange={(event) => setJoinCode(event.target.value)} placeholder="Например, A1B2C3" />
             </label>
-              <button className="btn-outline" type="submit" disabled={submitting} style={{ marginLeft: '-6px' }}>
+            <button className="btn-outline" type="submit" disabled={submitting}>
               Подключиться
             </button>
           </form>
@@ -636,7 +636,7 @@ const handleRoundResult = (payload) => {
                 <span>Режим: {session?.mode === 'competitive' ? 'соревновательный' : 'совместный'}</span>
               </div>
 
-              <div className="session-toolbar" style={{ marginBottom: '-4px' }}>
+              <div className="session-toolbar">
                 <div className="session-toolbar-actions">
                   {canStart &&
                   <button className="btn-primary" type="button" onClick={handleStartSession} disabled={submitting}>
@@ -646,7 +646,7 @@ const handleRoundResult = (payload) => {
                 </div>
               </div>
 
-<div className="session-participants" style={{ marginTop: '-18px' }}>
+<div className="session-participants">
                 {participants.map((participant) =>
               <div key={participant.userId} className="participant-pill">
                     <strong>{participant.username}</strong>

@@ -509,3 +509,4 @@ export default function Auth({ onAuthSuccess, onShowNotification }) {
     </>);
 
 }
+

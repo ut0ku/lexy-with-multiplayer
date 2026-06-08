@@ -130,8 +130,13 @@ function App() {
     }
   }, [showNotification]);
 
-  const loadPage = useCallback(async (pageName) => {
+const loadPage = useCallback(async (pageName) => {
     setCurrentPage(pageName);
+
+    if (pageName === 'multiplayer') {
+      document.body.classList.add('dark-theme');
+      document.body.classList.remove('light-theme');
+    }
 
     if (pageName === 'home' && window.initHomePage) {
       window.initHomePage();
@@ -374,7 +379,7 @@ function App() {
   useEffect(() => {
     loadAppState();
 
-    const applyStoredTheme = () => {
+const applyStoredTheme = () => {
       let storedTheme = 'dark';
 
       const userStr = localStorage.getItem('lexy_user');
@@ -393,7 +398,7 @@ function App() {
         storedTheme = window.AppState.user.theme;
       }
 
-      if (storedTheme === 'light') {
+      if (storedTheme === 'light' && currentPage !== 'multiplayer') {
         document.body.classList.add('light-theme');
         document.body.classList.remove('dark-theme');
       } else {
@@ -525,7 +530,30 @@ function App() {
       window.multiplayerSocket = null;
       window.subscribeUserToPush = null;
     };
-  }, [loadPage, initNavbarScrollEffect, subscribeUserToPush, showNotification]);
+}, [loadPage, initNavbarScrollEffect, subscribeUserToPush, showNotification]);
+
+  useEffect(() => {
+    const userStr = localStorage.getItem('lexy_user');
+    let storedTheme = 'dark';
+    if (userStr) {
+      try {
+        const localUser = JSON.parse(userStr);
+        if (localUser?.theme === 'light' || localUser?.theme === 'dark') {
+          storedTheme = localUser.theme;
+        }
+      } catch (e) {}
+    }
+    if (window.AppState?.user?.theme === 'light' || window.AppState?.user?.theme === 'dark') {
+      storedTheme = window.AppState.user.theme;
+    }
+    if (storedTheme === 'light' && currentPage !== 'multiplayer') {
+      document.body.classList.add('light-theme');
+      document.body.classList.remove('dark-theme');
+    } else if (currentPage !== 'multiplayer') {
+      document.body.classList.add('dark-theme');
+      document.body.classList.remove('light-theme');
+    }
+  }, [currentPage]);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -544,7 +572,7 @@ function App() {
         return <MyDecks onShowNotification={showNotification} />;
       case 'stats':
         return <Stats />;
-      case 'profile':
+case 'profile':
         return <Profile onLogout={handleLogout} onShowNotification={showNotification} onNavigate={loadPage} />;
       case 'admin':
         return <Admin onShowNotification={showNotification} onNavigate={loadPage} />;
@@ -723,3 +751,4 @@ function App() {
 }
 
 export default App;
+

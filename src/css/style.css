@@ -441,15 +441,6 @@ body,
     min-height: 48px;
 }
 
-.multiplayer-join-modal .modal-room-delete {
-    width: 100%;
-    height: 48px;
-    min-height: 48px;
-    margin-top: 12px;
-    padding-top: 0;
-    padding-bottom: 0;
-}
-
 .multiplayer-form input:focus,
 .multiplayer-form select:focus,
 .invite-inline-form input:focus,
@@ -548,23 +539,6 @@ body,
 .multiplayer-page .btn-outline:hover {
     background: rgba(236, 198, 126, 0.08);
     border-color: rgba(236, 198, 126, 0.55);
-}
-
-.multiplayer-join-modal .modal-room-delete {
-    width: 100%;
-    height: 48px;
-    min-height: 48px;
-    margin-top: 12px;
-    padding-top: 0;
-    padding-bottom: 0;
-}
-
-.multiplayer-page .btn-incorrect {
-    border-color: rgba(255, 59, 48, 0.38);
-}
-
-.multiplayer-page .btn-incorrect:hover {
-    transform: translateY(-1px);
 }
 
 .session-participants,
@@ -2584,10 +2558,6 @@ input:focus, textarea:focus {
     margin-left: 2px;
 }
 
-.icon-circle img[src*="delete"] {
-    margin-left: 1px;
-}
-
 .settings-item span {
     display: flex;
     align-items: center;
@@ -3244,3 +3214,4 @@ input:focus, textarea:focus {
         width: 100%;
     }
 }
+

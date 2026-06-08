@@ -529,6 +529,22 @@ export const api = {
   },
 
   multiplayer: {
+    async getOverview() {
+      const response = await fetch(`${MULTIPLAYER_API_URL}/overview`, {
+        headers: getAuthHeaders()
+      });
+      const contentType = response.headers.get('content-type') || '';
+      let data;
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(text || 'Server error');
+      }
+      if (!response.ok) throw new Error(data.error || 'Failed to load multiplayer overview');
+      return data;
+    },
+
     async getInvites() {
       const response = await fetch(`${MULTIPLAYER_API_URL}/invites`, {
         headers: getAuthHeaders()
