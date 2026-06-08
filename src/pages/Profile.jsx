@@ -47,7 +47,7 @@ export default function Profile({ onLogout, onShowNotification, onNavigate }) {
     }
   }, []);
 
-const toggleTheme = useCallback((e) => {
+  const toggleTheme = useCallback((e) => {
     const isLight = e.target.checked;
     applyTheme(isLight ? 'light' : 'dark');
     setIsLightTheme(isLight);

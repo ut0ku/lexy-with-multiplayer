@@ -628,6 +628,16 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
             };
             const myPosition = leaderboard.find((row) => Number(row.user_id) === Number(req.user.id));
 
+            const historyResult = await mpPool.query(
+                `SELECT s.*
+                 FROM multiplayer_sessions s
+                 JOIN multiplayer_session_participants p ON p.session_id = s.id
+                 WHERE p.user_id = $1
+                 ORDER BY s.created_at DESC
+                 LIMIT 20`,
+                [req.user.id]
+            );
+
             const activeResult = await mpPool.query(
                 `SELECT s.id,
                     s.code,
@@ -648,8 +658,43 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
                  LIMIT 12`
             );
 
-            const deckIds = activeResult.rows.map((row) => row.deck_id);
+            const deckIds = [...historyResult.rows.map((row) => row.deck_id), ...activeResult.rows.map((row) => row.deck_id)];
             const decks = await fetchDecksByIds(mpPool, deckIds);
+
+            const summarizeSession = async (sessionRow) => {
+                const participants = await loadParticipants(mpPool, sessionRow.id, { activeOnly: false });
+                const participantUsers = await fetchUsersByIds(mpPool, participants.map((participant) => participant.user_id), mainPool);
+                return {
+                    id: sessionRow.id,
+                    code: sessionRow.code,
+                    mode: sessionRow.mode,
+                    input_mode: sessionRow.input_mode,
+                    status: sessionRow.status,
+                    created_at: sessionRow.created_at,
+                    started_at: sessionRow.started_at,
+                    finished_at: sessionRow.finished_at,
+                    deck_id: sessionRow.deck_id,
+                    deck_name: decks.get(Number(sessionRow.deck_id))?.name || 'Колода',
+                    winner_user_id: sessionRow.winner_user_id,
+                    participants: participants.map((participant) => {
+                        const user = participantUsers.get(Number(participant.user_id));
+                        return {
+                            id: participant.id,
+                            userId: participant.user_id,
+                            username: user?.username || 'unknown',
+                            name: user?.name || 'Пользователь',
+                            correctCount: participant.correct_count,
+                            incorrectCount: participant.incorrect_count,
+                            totalTimeMs: participant.total_time_ms,
+                            score: participant.score,
+                            status: participant.status
+                        };
+                    })
+                };
+            };
+
+            const history = [];
+            for (const session of historyResult.rows) history.push(await summarizeSession(session));
 
             res.json({
                 me: {
@@ -657,6 +702,7 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
                     position: myPosition?.position || null
                 },
                 leaderboard,
+                history,
                 activeSessions: activeResult.rows.map((session) => ({
                     id: session.id,
                     code: session.code,
@@ -1213,6 +1259,57 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
             });
         } catch (error) {
             console.error('multiplayer leaderboard error:', error);
+            res.status(500).json({ error: 'Ошибка сервера' });
+        }
+    });
+
+    app.get('/api/multiplayer/history', authenticateToken, async (req, res) => {
+        try {
+            const sessions = await mpPool.query(
+                `SELECT s.*
+                 FROM multiplayer_sessions s
+                 JOIN multiplayer_session_participants p ON p.session_id = s.id
+                 WHERE p.user_id = $1
+                 ORDER BY s.created_at DESC`,
+                [req.user.id]
+            );
+            const decks = await fetchDecksByIds(mpPool, sessions.rows.map((row) => row.deck_id));
+            const history = [];
+            for (const session of sessions.rows) {
+                const participants = await loadParticipants(mpPool, session.id);
+                const userMap = await fetchUsersByIds(mpPool, participants.map((participant) => participant.user_id), mainPool);
+                history.push({
+                    id: session.id,
+                    code: session.code,
+                    mode: session.mode,
+                    input_mode: session.input_mode,
+                    status: session.status,
+                    created_at: session.created_at,
+                    started_at: session.started_at,
+                    finished_at: session.finished_at,
+                    deck_id: session.deck_id,
+                    deck_name: decks.get(Number(session.deck_id))?.name || 'Колода',
+                    winner_user_id: session.winner_user_id,
+                    participants: participants.map((participant) => {
+                        const user = userMap.get(Number(participant.user_id));
+                        return {
+                            id: participant.id,
+                            userId: participant.user_id,
+                            username: user?.username || 'unknown',
+                            name: user?.name || 'Пользователь',
+                            correctCount: participant.correct_count,
+                            incorrectCount: participant.incorrect_count,
+                            totalTimeMs: participant.total_time_ms,
+                            score: participant.score,
+                            status: participant.status
+                        };
+                    })
+                });
+            }
+
+            res.json({ history });
+        } catch (error) {
+            console.error('multiplayer history error:', error);
             res.status(500).json({ error: 'Ошибка сервера' });
         }
     });

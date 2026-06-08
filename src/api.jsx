@@ -719,6 +719,22 @@ export const api = {
       return data;
     },
 
+    async getLeaderboard() {
+      const response = await fetch(`${MULTIPLAYER_API_URL}/leaderboard`, {
+        headers: getAuthHeaders()
+      });
+      const contentType = response.headers.get('content-type') || '';
+      let data;
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(text || 'Server error');
+      }
+      if (!response.ok) throw new Error(data.error || 'Failed to load leaderboard');
+      return data;
+    },
+
     async getHistory() {
       const response = await fetch(`${MULTIPLAYER_API_URL}/history`, {
         headers: getAuthHeaders()

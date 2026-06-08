@@ -363,6 +363,9 @@ const multiplayerApiSpec = {
                 parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }]
             })
         },
+        '/api/multiplayer/leaderboard': {
+            get: pathItem('Get the leaderboard', 'Leaderboard')
+        },
         '/api/multiplayer/history': {
             get: pathItem('Get multiplayer history', 'History')
         }

@@ -13,22 +13,6 @@ import { io } from 'socket.io-client';
 
 const MULTIPLAYER_SOCKET_URL = import.meta.env.VITE_MULTIPLAYER_SOCKET_URL || 'http://localhost:3003';
 
-function getStoredTheme() {
-  const userStr = localStorage.getItem('lexy_user');
-  if (userStr) {
-    try {
-      const localUser = JSON.parse(userStr);
-      if (localUser?.theme === 'light' || localUser?.theme === 'dark') {
-        return localUser.theme;
-      }
-    } catch (e) {}
-  }
-  if (window.AppState?.user?.theme === 'light' || window.AppState?.user?.theme === 'dark') {
-    return window.AppState.user.theme;
-  }
-  return 'dark';
-}
-
 function App() {
   const [userDecks, setUserDecks] = useState([]);
   const [currentPage, setCurrentPage] = useState('home');
@@ -146,14 +130,8 @@ function App() {
     }
   }, [showNotification]);
 
-const loadPage = useCallback(async (pageName) => {
+  const loadPage = useCallback(async (pageName) => {
     setCurrentPage(pageName);
-
-    if (pageName === 'multiplayer') {
-      const stored = getStoredTheme();
-      document.body.classList.remove('dark-theme', 'light-theme');
-      document.body.classList.add(stored === 'light' ? 'light-theme' : 'dark-theme');
-    }
 
     if (pageName === 'home' && window.initHomePage) {
       window.initHomePage();
@@ -396,6 +374,36 @@ const loadPage = useCallback(async (pageName) => {
   useEffect(() => {
     loadAppState();
 
+    const applyStoredTheme = () => {
+      let storedTheme = 'dark';
+
+      const userStr = localStorage.getItem('lexy_user');
+      if (userStr) {
+        try {
+          const localUser = JSON.parse(userStr);
+          if (localUser?.theme === 'light' || localUser?.theme === 'dark') {
+            storedTheme = localUser.theme;
+          }
+        } catch (e) {
+
+        }
+      }
+
+      if (window.AppState?.user?.theme === 'light' || window.AppState?.user?.theme === 'dark') {
+        storedTheme = window.AppState.user.theme;
+      }
+
+      if (storedTheme === 'light') {
+        document.body.classList.add('light-theme');
+        document.body.classList.remove('dark-theme');
+      } else {
+        document.body.classList.add('dark-theme');
+        document.body.classList.remove('light-theme');
+      }
+    };
+
+    applyStoredTheme();
+
     const init = async () => {
       loadingHideTimerRef.current = setTimeout(() => {
         setIsLoadingHidden(true);
@@ -517,7 +525,7 @@ const loadPage = useCallback(async (pageName) => {
       window.multiplayerSocket = null;
       window.subscribeUserToPush = null;
     };
-}, [loadPage, initNavbarScrollEffect, subscribeUserToPush, showNotification]);
+  }, [loadPage, initNavbarScrollEffect, subscribeUserToPush, showNotification]);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -536,7 +544,7 @@ const loadPage = useCallback(async (pageName) => {
         return <MyDecks onShowNotification={showNotification} />;
       case 'stats':
         return <Stats />;
-case 'profile':
+      case 'profile':
         return <Profile onLogout={handleLogout} onShowNotification={showNotification} onNavigate={loadPage} />;
       case 'admin':
         return <Admin onShowNotification={showNotification} onNavigate={loadPage} />;

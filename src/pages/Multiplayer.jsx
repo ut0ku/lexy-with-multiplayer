@@ -40,7 +40,7 @@ export default function Multiplayer({ onShowNotification }) {
   const [roundNotice, setRoundNotice] = useState(null);
   const [joinRoom, setJoinRoom] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  
+  const [showFinishedModal, setShowFinishedModal] = useState(true);
   const socketRef = useRef(null);
   const previousSessionStatusRef = useRef(null);
 
@@ -133,7 +133,13 @@ export default function Multiplayer({ onShowNotification }) {
     return () => clearInterval(timer);
   }, [activeSession?.session?.id, loadOverview, syncSessionState]);
 
-
+  useEffect(() => {
+    const currentStatus = activeSession?.session?.status || null;
+    if (currentStatus === 'finished' && previousSessionStatusRef.current !== 'finished') {
+      setShowFinishedModal(true);
+    }
+    previousSessionStatusRef.current = currentStatus;
+  }, [activeSession?.session?.status]);
 
   useEffect(() => {
     const token = localStorage.getItem('lexy_token');

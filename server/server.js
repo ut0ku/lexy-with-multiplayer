@@ -18,6 +18,9 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const { Server } = require('socket.io');
+const webpush = require('web-push');
+const cron = require('node-cron');
+const { mountSwagger, mainApiSpec } = require('./swagger');
 
 const app = express();
 
@@ -28,6 +31,7 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
+// Force HTTP in development
 const server = http.createServer(app);
 console.log('Сервер работает в режиме HTTP для разработки.');
 const io = new Server(server, {
@@ -51,6 +55,8 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+mountSwagger(app, '/api-docs', mainApiSpec);
 
 app.use(express.static(path.join(__dirname, '..')));
 
@@ -215,6 +221,7 @@ async function initDatabase() {
             )
         `);
 
+        // Ensure compatibility: add missing columns if the existing table was created differently
         try {
             await pool.query("ALTER TABLE deck_publish_requests ADD COLUMN IF NOT EXISTS message TEXT");
             await pool.query("ALTER TABLE deck_publish_requests ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT ''");
@@ -262,6 +269,7 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
+// Copy public decks on write.
 async function ensureUserHasWritableDeck(userId, deckId) {
     const ud = await pool.query('SELECT * FROM user_decks WHERE user_id = $1 AND deck_id = $2', [userId, deckId]);
     if (ud.rows.length === 0) {
@@ -287,6 +295,7 @@ async function ensureUserHasWritableDeck(userId, deckId) {
         const ins = await client.query('INSERT INTO decks (name, description) VALUES ($1, $2) RETURNING *', [d.name, d.description || '']);
         const newDeck = ins.rows[0];
 
+        // Preserve the deck image when present
         const img = await client.query('SELECT image_data, mime_type FROM deck_images WHERE deck_id = $1', [deckId]);
         if (img.rows.length > 0) {
             await client.query('INSERT INTO deck_images (deck_id, image_data, mime_type) VALUES ($1, $2, $3)', [newDeck.id, img.rows[0].image_data, img.rows[0].mime_type]);
@@ -419,6 +428,7 @@ app.post('/api/notifications/subscribe', authenticateToken, async (req, res) => 
 
 app.post('/api/notifications/test', authenticateToken, async (req, res) => {
     try {
+        // Respect notification preference
         const userRes = await pool.query('SELECT notifications_enabled FROM users WHERE id = $1', [req.user.id]);
         if (userRes.rows.length > 0 && userRes.rows[0].notifications_enabled === false) {
             return res.status(400).json({ error: 'Уведомления отключены' });
@@ -537,6 +547,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
     }
 });
 
+// Submit a deck for review
 app.post('/api/decks/:id/submit', authenticateToken, async (req, res) => {
     try {
         const deckId = req.params.id;
@@ -790,6 +801,7 @@ app.post('/api/activity', authenticateToken, async (req, res) => {
     }
 });
 
+// Sync local state
 app.get('/api/sync', authenticateToken, async (req, res) => {
     try {
         const decksResult = await pool.query(
@@ -917,6 +929,7 @@ app.post('/api/decks/:id/add', authenticateToken, async (req, res) => {
             const ins = await client.query('INSERT INTO decks (name, description) VALUES ($1, $2) RETURNING *', [d.name, d.description || '']);
             const newDeck = ins.rows[0];
 
+            // Preserve any deck image
             const img = await client.query('SELECT image_data, mime_type FROM deck_images WHERE deck_id = $1', [deckId]);
             if (img.rows.length > 0) {
                 await client.query('INSERT INTO deck_images (deck_id, image_data, mime_type) VALUES ($1, $2, $3)', [newDeck.id, img.rows[0].image_data, img.rows[0].mime_type]);
@@ -1068,6 +1081,7 @@ app.get('/api/decks/:id/image', async (req, res) => {
     }
 });
 
+// CARDS API
 app.get('/api/decks/:id/cards', authenticateToken, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM cards WHERE deck_id = $1', [req.params.id]);
@@ -1081,6 +1095,7 @@ app.post('/api/decks/:id/cards', authenticateToken, async (req, res) => {
     try {
         const { front, back } = req.body;
 
+        // Ensure user has writable deck (copy-on-write if needed)
         const ensure = await ensureUserHasWritableDeck(req.user.id, req.params.id);
         if (!ensure.ok) {
             if (ensure.error === 'not_found') return res.status(404).json({ error: 'Доступ запрещён' });
@@ -1260,6 +1275,7 @@ app.delete('/api/cards/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// Internal lookup for multiplayer service
 app.get('/api/internal/users/search', authenticateToken, async (req, res) => {
     try {
         const { username } = req.query;
@@ -1434,6 +1450,7 @@ app.get('/api/public-decks/:id/cards', async (req, res) => {
     }
 });
 
+// Daily inactivity check
 cron.schedule('0 0 * * *', async () => {
     console.log('Running daily notification check...');
     try {
@@ -1522,4 +1539,3 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
-

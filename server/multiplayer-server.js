@@ -7,6 +7,7 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
 const { registerMultiplayer } = require('./multiplayer-service');
+const { mountSwagger, multiplayerApiSpec } = require('./swagger');
 
 const app = express();
 const server = http.createServer(app);
@@ -27,6 +28,8 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+mountSwagger(app, '/api-docs', multiplayerApiSpec);
 
 function authenticateSocket(socket, next) {
     try {
@@ -52,4 +55,3 @@ registerMultiplayer({ app, io }).catch((error) => {
 server.listen(PORT, () => {
     console.log(`Multiplayer service running on http://localhost:${PORT}`);
 });
-

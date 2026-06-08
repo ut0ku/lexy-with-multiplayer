@@ -116,4 +116,3 @@ export default function StudyMode({ deck, onClose, onShowNotification, onToggleF
     </div>);
 
 }
-

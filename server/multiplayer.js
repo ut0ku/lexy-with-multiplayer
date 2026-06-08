@@ -375,6 +375,39 @@ async function registerMultiplayer({ app, pool, io, authenticateToken, connected
                  LIMIT 20`
             );
 
+            const history = await pool.query(
+                `SELECT s.id,
+                        s.code,
+                        s.mode,
+                        s.input_mode,
+                        s.status,
+                        s.created_at,
+                        s.started_at,
+                        s.finished_at,
+                        s.deck_id,
+                        d.name AS deck_name,
+                        s.winner_user_id,
+                        COALESCE(json_agg(json_build_object(
+                            'id', p.id,
+                            'userId', p.user_id,
+                            'username', u.username,
+                            'name', u.name,
+                            'correctCount', p.correct_count,
+                            'incorrectCount', p.incorrect_count,
+                            'totalTimeMs', p.total_time_ms,
+                            'score', p.score,
+                            'status', p.status
+                        ) ORDER BY p.joined_at ASC) FILTER (WHERE p.id IS NOT NULL), '[]') AS participants
+                 FROM multiplayer_sessions s
+                 JOIN multiplayer_session_participants p ON p.session_id = s.id
+                 JOIN users u ON u.id = p.user_id
+                 LEFT JOIN decks d ON d.id = s.deck_id
+                 WHERE p.user_id = $1
+                 GROUP BY s.id, d.name
+                 ORDER BY s.created_at DESC
+                 LIMIT 20`,
+                [req.user.id]
+            );
 
             const recentSessions = await pool.query(
                 `SELECT s.id,
@@ -414,6 +447,7 @@ async function registerMultiplayer({ app, pool, io, authenticateToken, connected
                     position: null
                 },
                 leaderboard: leaderboard.rows,
+                history: history.rows,
                 activeSessions: recentSessions.rows
             });
         } catch (error) {
@@ -953,7 +987,47 @@ async function registerMultiplayer({ app, pool, io, authenticateToken, connected
         }
     });
 
+    app.get('/api/multiplayer/history', authenticateToken, async (req, res) => {
+        try {
+            const result = await pool.query(
+                `SELECT s.id,
+                        s.code,
+                        s.mode,
+                        s.input_mode,
+                        s.status,
+                        s.created_at,
+                        s.started_at,
+                        s.finished_at,
+                        s.deck_id,
+                        d.name AS deck_name,
+                        s.winner_user_id,
+                        COALESCE(json_agg(json_build_object(
+                            'id', p.id,
+                            'userId', p.user_id,
+                            'username', u.username,
+                            'name', u.name,
+                            'correctCount', p.correct_count,
+                            'incorrectCount', p.incorrect_count,
+                            'totalTimeMs', p.total_time_ms,
+                            'score', p.score,
+                            'status', p.status
+                        ) ORDER BY p.joined_at ASC) FILTER (WHERE p.id IS NOT NULL), '[]') AS participants
+                 FROM multiplayer_sessions s
+                 JOIN multiplayer_session_participants p ON p.session_id = s.id
+                 JOIN users u ON u.id = p.user_id
+                 LEFT JOIN decks d ON d.id = s.deck_id
+                 WHERE p.user_id = $1
+                 GROUP BY s.id, d.name
+                 ORDER BY s.created_at DESC`,
+                [req.user.id]
+            );
 
+            res.json({ history: result.rows });
+        } catch (error) {
+            console.error('multiplayer history error:', error);
+            res.status(500).json({ error: 'Ошибка сервера' });
+        }
+    });
 
     io.on('connection', (socket) => {
         socket.on('multiplayer:joinRoom', async ({ sessionId }) => {
