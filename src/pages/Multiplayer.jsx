@@ -666,9 +666,10 @@ export default function Multiplayer({ onShowNotification }) {
   const currentCard = activeSession?.currentCard || null;
   const isHost = String(session?.hostUserId) === String(currentUser?.id);
   const isAdmin = currentUser?.role === 'admin';
-  const canStart = isHost && session?.status === 'waiting';
-  const canDelete = (isHost || isAdmin) && session?.status !== 'finished';
-  const historyNeedsScroll = overview.history.length > 3;
+const canStart = isHost && session?.status === 'waiting';
+   const canDelete = (isHost || isAdmin) && session?.status !== 'finished';
+   const historyNeedsScroll = overview.history.length > 3;
+   const activeNeedsScroll = overview.activeSessions.length > 3;
 
   return (
     <div className="multiplayer-page">
@@ -943,10 +944,10 @@ export default function Multiplayer({ onShowNotification }) {
         </section>
       </div>
 
-      <section className="multiplayer-card wide">
-        <h2>Активные комнаты</h2>
-        <div className="active-session-list">
-          {overview.activeSessions.length === 0 ?
+<section className="multiplayer-card wide">
+         <h2>Активные комнаты</h2>
+         <div className={`active-session-list ${activeNeedsScroll ? 'scrollable' : ''}`}>
+           {overview.activeSessions.length === 0 ?
           <p className="empty-note">Нет активных комнат.</p> :
 
           overview.activeSessions.map((entry) =>
