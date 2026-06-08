@@ -744,16 +744,16 @@ export default function Multiplayer({ onShowNotification }) {
           </form>
         </section>
 
-        <section className="multiplayer-card wide">
-          <h2>Текущая сессия</h2>
-          {activeSession ?
-          <div className="session-panel">
-              <div className="session-meta">
-                <span>Код: {session?.code}</span>
-                <span>Режим: {session?.mode === 'competitive' ? 'соревновательный' : 'совместный'}</span>
-                <span>Ответ: {session?.inputMode === 'text' ? 'клавиатура' : 'кнопки'}</span>
-                <span>Статус: {session?.status}</span>
-              </div>
+<section className="multiplayer-card wide">
+           <h2>Текущая сессия</h2>
+           {activeSession ?
+           <div className="session-panel">
+               <div className="session-meta">
+                 <span style={{ cursor: 'pointer' }} onClick={() => { navigator.clipboard.writeText(session?.code || ''); notify('Код скопирован'); }}>Код: {session?.code}</span>
+                 <span>Режим: {session?.mode === 'competitive' ? 'соревновательный' : 'совместный'}</span>
+                 <span>Ответ: {session?.inputMode === 'text' ? 'клавиатура' : 'кнопки'}</span>
+                 <span>Статус: {session?.status}</span>
+               </div>
 
               <div className="session-toolbar">
                 <form className="invite-inline-form" onSubmit={handleSendInvite}>
@@ -962,12 +962,15 @@ export default function Multiplayer({ onShowNotification }) {
                     <span className="active-session-label">Nickname:</span>
                     <span className="active-session-label">Deck:</span>
                   </div>
-                  <div className="active-session-values">
-                    <strong>{entry.host_username || entry.host_name || 'Пользователь'}</strong>
-                    <strong>{entry.deck_name}</strong>
-                  </div>
-                </div>
-              </button>
+<div className="active-session-values">
+                     <strong>{entry.host_username || entry.host_name || 'Пользователь'}</strong>
+                     <strong>{entry.deck_name}</strong>
+                   </div>
+                   <div className="active-session-meta">
+                     <span style={{ cursor: 'pointer' }} onClick={(event) => { event.stopPropagation(); navigator.clipboard.writeText(entry.code || ''); notify('Код скопирован'); }}>Код: {entry.code}</span>
+                   </div>
+                 </div>
+               </button>
           )
           }
         </div>
