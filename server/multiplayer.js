@@ -574,6 +574,36 @@ async function registerMultiplayer({ app, pool, io, authenticateToken, connected
         }
     });
 
+    app.delete('/api/multiplayer/sessions/:id', authenticateToken, async (req, res) => {
+        try {
+            const sessionId = Number(req.params.id);
+            if (!sessionId) {
+                return res.status(400).json({ error: 'Некорректный идентификатор сессии' });
+            }
+
+            const session = await loadSessionById(pool, sessionId);
+            if (!session) {
+                return res.status(404).json({ error: 'Сессия не найдена' });
+            }
+
+            if (Number(session.host_user_id) !== Number(req.user.id)) {
+                return res.status(403).json({ error: 'Доступ запрещён' });
+            }
+
+            await pool.query('DELETE FROM multiplayer_sessions WHERE id = $1', [sessionId]);
+
+            io.to(createRoomName(sessionId)).emit('multiplayer:sessionDeleted', {
+                sessionId,
+                code: session.code
+            });
+
+            res.json({ deleted: true, sessionId });
+        } catch (error) {
+            console.error('multiplayer delete session error:', error);
+            res.status(500).json({ error: 'Ошибка сервера' });
+        }
+    });
+
     app.post('/api/multiplayer/sessions/:id/invites', authenticateToken, async (req, res) => {
         try {
             const sessionId = Number(req.params.id);

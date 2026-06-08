@@ -100,13 +100,19 @@ export default function Multiplayer({ onShowNotification }) {
 
     try {
       const data = await api.multiplayer.getSession(sessionId);
-if (data?.session) {
+      if (data?.session) {
         setActiveSession(data.session);
       }
     } catch (error) {
-      // ignore
+
     }
   }, []);
+
+
+
+
+
+
 
   useEffect(() => {
     const token = localStorage.getItem('lexy_token');
@@ -175,12 +181,28 @@ if (data?.session) {
       loadOverview();
     };
 
+    const handleSessionDeleted = (payload) => {
+      if (!payload?.sessionId) return;
+
+      const storedSessionId = localStorage.getItem(CURRENT_SESSION_KEY);
+      if (String(storedSessionId) === String(payload.sessionId)) {
+        setActiveSession(null);
+        setRoundNotice(null);
+        setShowFinishedModal(true);
+        localStorage.removeItem(CURRENT_SESSION_KEY);
+      }
+
+      loadOverview();
+      notify('Комната удалена', 'accent');
+    };
+
     const handleOverviewUpdated = () => {};
 
     socket.on('multiplayer:invite', handleInvite);
     socket.on('multiplayer:sessionUpdated', () => {});
     socket.on('multiplayer:sessionState', () => {});
     socket.on('multiplayer:sessionFinished', handleFinished);
+    socket.on('multiplayer:sessionDeleted', handleSessionDeleted);
     socket.on('multiplayer:overviewUpdated', handleOverviewUpdated);
     socket.on('multiplayer:roundResult', () => {});
     socket.on('multiplayer:roundStarted', () => {});
@@ -190,6 +212,7 @@ if (data?.session) {
       socket.off('multiplayer:sessionUpdated', () => {});
       socket.off('multiplayer:sessionState', () => {});
       socket.off('multiplayer:sessionFinished', handleFinished);
+      socket.off('multiplayer:sessionDeleted', handleSessionDeleted);
       socket.off('multiplayer:overviewUpdated', handleOverviewUpdated);
       socket.off('multiplayer:roundResult', () => {});
       socket.off('multiplayer:roundStarted', () => {});
@@ -275,38 +298,60 @@ if (data?.session) {
     } finally {
       setSubmitting(false);
     }
-};
+  };
+
+
+  const handleDeleteSession = async (sessionId, { confirm = true } = {}) => {
+    if (!sessionId) return;
+    if (confirm) {
+      const confirmed = window.confirm('Удалить комнату?');
+      if (!confirmed) return;
+    }
+
+    try {
+      setSubmitting(true);
+      await api.multiplayer.deleteSession(sessionId);
+      const currentSessionId = activeSession?.session?.id || localStorage.getItem(CURRENT_SESSION_KEY);
+      if (String(currentSessionId) === String(sessionId)) {
+        const socket = socketRef.current;
+        if (socket) {
+          socket.emit('multiplayer:leaveRoom', { sessionId });
+        }
+        setActiveSession(null);
+        setRoundNotice(null);
+        localStorage.removeItem(CURRENT_SESSION_KEY);
+      }
+      await loadOverview();
+      notify('Комната удалена');
+    } catch (error) {
+      notify(error.message || 'Не удалось удалить комнату', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleLeaveLobby = async (sessionId) => {
     if (!sessionId) return;
 
+    const isCreator = String(activeSession?.session?.hostUserId) === String(currentUser?.id);
+    if (isCreator) {
+      await handleDeleteSession(sessionId, { confirm: false });
+      return;
+    }
+
     try {
       setSubmitting(true);
-      const isCreator = String(activeSession?.session?.hostUserId) === String(currentUser?.id);
-      if (isCreator) {
-        const socket = socketRef.current;
-        if (socket) {
-          socket.emit('multiplayer:leaveRoom', { sessionId });
-        }
-        setActiveSession(null);
-        setRoundNotice(null);
-        setShowFinishedModal(true);
-        localStorage.removeItem(CURRENT_SESSION_KEY);
-        await loadOverview();
-        notify('Вы покинули лобби');
-      } else {
-        await api.multiplayer.leaveSession(sessionId);
-        const socket = socketRef.current;
-        if (socket) {
-          socket.emit('multiplayer:leaveRoom', { sessionId });
-        }
-        setActiveSession(null);
-        setRoundNotice(null);
-        setShowFinishedModal(true);
-        localStorage.removeItem(CURRENT_SESSION_KEY);
-        await loadOverview();
-        notify('Вы покинули лобби');
+      await api.multiplayer.leaveSession(sessionId);
+      const socket = socketRef.current;
+      if (socket) {
+        socket.emit('multiplayer:leaveRoom', { sessionId });
       }
+      setActiveSession(null);
+      setRoundNotice(null);
+      setShowFinishedModal(true);
+      localStorage.removeItem(CURRENT_SESSION_KEY);
+      await loadOverview();
+      notify('Вы покинули лобби');
     } catch (error) {
       notify(error.message || 'Не удалось покинуть лобби', 'error');
     } finally {
@@ -551,7 +596,9 @@ if (data?.session) {
   const participants = activeSession?.participants || [];
   const currentCard = activeSession?.currentCard || null;
   const isHost = String(session?.hostUserId) === String(currentUser?.id);
+  const isAdmin = currentUser?.role === 'admin';
   const canStart = isHost && session?.status === 'waiting';
+  const canDelete = (isHost || isAdmin) && session?.status !== 'finished';
 
   return (
     <div className="multiplayer-page">
@@ -626,10 +673,15 @@ if (data?.session) {
               <div className="session-toolbar">
                 <div className="session-toolbar-actions">
                   {canStart &&
-                  <button className="btn-primary" type="button" onClick={handleStartSession} disabled={submitting}>
+                <button className="btn-primary" type="button" onClick={handleStartSession} disabled={submitting}>
                       Запустить сессию
                     </button>
-                  }
+                }
+                  {canDelete &&
+                <button className="btn-incorrect" type="button" onClick={() => handleDeleteSession(session.id)} disabled={submitting}>
+                      Удалить комнату
+                    </button>
+                }
                 </div>
               </div>
 

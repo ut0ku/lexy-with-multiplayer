@@ -321,7 +321,6 @@ async function fetchDecksByIds(mpPool, deckIds) {
     return new Map(result.rows.map((row) => [Number(row.id), row]));
 }
 
-// Resolve synced deck data
 async function fetchOwnedDeck(mpPool, userId, deckId) {
     const deck = await fetchDeck(mpPool, deckId);
     return deck ? { id: deck.id, name: deck.name } : null;
@@ -831,7 +830,7 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
         }
     });
 
-    app.post('/api/multiplayer/sessions/:id/leave', authenticateToken, async (req, res) => {
+    app.delete('/api/multiplayer/sessions/:id', authenticateToken, async (req, res) => {
         try {
             const sessionId = Number(req.params.id);
             if (!sessionId) {
@@ -844,28 +843,69 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
             }
 
             const isHost = Number(session.host_user_id) === Number(req.user.id);
+            const isAdmin = req.user?.role === 'admin';
+            if (!isHost && !isAdmin) {
+                return res.status(403).json({ error: 'Доступ запрещён' });
+            }
+
+            const participants = await loadParticipants(mpPool, sessionId);
+            const audienceUserIds = [...new Set([Number(session.host_user_id), ...participants.map((participant) => Number(participant.user_id))])].filter(Boolean);
+            let audience = io.to(createRoomName(sessionId));
+            for (const userId of audienceUserIds) {
+                audience = audience.to(`user_${userId}`);
+            }
+
+            await mpPool.query('BEGIN');
+            await mpPool.query('DELETE FROM multiplayer_session_answers WHERE session_id = $1', [sessionId]);
+            await mpPool.query('DELETE FROM multiplayer_session_invites WHERE session_id = $1', [sessionId]);
+            await mpPool.query('DELETE FROM multiplayer_session_participants WHERE session_id = $1', [sessionId]);
+            await mpPool.query('DELETE FROM multiplayer_sessions WHERE id = $1', [sessionId]);
+            await mpPool.query('COMMIT');
+
+            audience.emit('multiplayer:sessionDeleted', {
+                sessionId,
+                code: session.code
+            });
+            io.emit('multiplayer:overviewUpdated', { reason: 'deleted', sessionId });
+
+            res.json({ deleted: true, sessionId });
+        } catch (error) {
+            await mpPool.query('ROLLBACK').catch(() => {});
+            console.error('multiplayer delete session error:', error);
+            res.status(500).json({ error: 'Ошибка сервера' });
+        }
+    });
+
+    app.post('/api/multiplayer/sessions/:id/leave', authenticateToken, async (req, res) => {
+        try {
+            const sessionId = Number(req.params.id);
+            if (!sessionId) {
+                return res.status(400).json({ error: 'Некорректный идентификатор сессии' });
+            }
+
+            const session = await loadSession(mpPool, sessionId);
+            if (!session) {
+                return res.status(404).json({ error: 'Сессия не найдена' });
+            }
+
+            if (Number(session.host_user_id) === Number(req.user.id)) {
+                return res.status(400).json({ error: 'Создатель сессии должен удалять лобби через удаление комнаты' });
+            }
+
             const participant = await mpPool.query(
                 'SELECT id FROM multiplayer_session_participants WHERE session_id = $1 AND user_id = $2',
                 [sessionId, req.user.id]
             );
-
-            if (isHost) {
-                await mpPool.query(
-                    `UPDATE multiplayer_session_participants
-                     SET status = 'left', last_seen_at = CURRENT_TIMESTAMP
-                     WHERE session_id = $1 AND user_id = $2`,
-                    [sessionId, req.user.id]
-                );
-            } else if (participant.rows.length > 0) {
-                await mpPool.query(
-                    `UPDATE multiplayer_session_participants
-                     SET status = 'left', last_seen_at = CURRENT_TIMESTAMP
-                     WHERE session_id = $1 AND user_id = $2`,
-                    [sessionId, req.user.id]
-                );
-            } else {
+            if (participant.rows.length === 0) {
                 return res.status(404).json({ error: 'Участник не найден' });
             }
+
+            await mpPool.query(
+                `UPDATE multiplayer_session_participants
+                 SET status = 'left', last_seen_at = CURRENT_TIMESTAMP
+                 WHERE session_id = $1 AND user_id = $2`,
+                [sessionId, req.user.id]
+            );
 
             const payload = await buildSessionPayload(context, sessionId);
             await emitSessionToAudience(context, sessionId, 'multiplayer:sessionUpdated', payload);
