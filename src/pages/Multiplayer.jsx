@@ -27,6 +27,7 @@ function getStoredUser() {
 
 export default function Multiplayer({ onShowNotification }) {
   const [loading, setLoading] = useState(true);
+  const [overview, setOverview] = useState({ me: {} });
   const [availableDecks, setAvailableDecks] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
@@ -55,6 +56,17 @@ export default function Multiplayer({ onShowNotification }) {
 
     socket.emit('multiplayer:joinRoom', { sessionId });
   }, []);
+
+  const loadOverview = useCallback(async () => {
+    try {
+      const data = await api.multiplayer.getOverview();
+      setOverview({
+        me: data.me || {}
+      });
+    } catch (error) {
+      notify(error.message || 'Не удалось загрузить мультиплеер', 'error');
+    }
+  }, [notify]);
 
   const loadDecks = useCallback(async () => {
     try {
@@ -87,10 +99,11 @@ export default function Multiplayer({ onShowNotification }) {
 
     try {
       const data = await api.multiplayer.getSession(sessionId);
-      if (data?.session) {
+if (data?.session) {
         setActiveSession(data.session);
       }
     } catch (error) {
+      // ignore
     }
   }, []);
 
@@ -123,7 +136,7 @@ export default function Multiplayer({ onShowNotification }) {
       setRoundNotice(payload);
     };
 
-    const handleRoundResult = (payload) => {
+const handleRoundResult = (payload) => {
       if (payload?.session) {
         if (String(payload.session.id) === String(localStorage.getItem(CURRENT_SESSION_KEY))) {
           syncSessionState(payload.session.id);
@@ -153,22 +166,27 @@ export default function Multiplayer({ onShowNotification }) {
         syncSessionState(payload.session.id);
       }
       setShowFinishedModal(true);
-    setRoundNotice(payload);
-  };
+      setRoundNotice(payload);
+      loadOverview();
+    };
+
+    const handleOverviewUpdated = () => {};
 
     socket.on('multiplayer:invite', handleInvite);
     socket.on('multiplayer:sessionUpdated', () => {});
     socket.on('multiplayer:sessionState', () => {});
     socket.on('multiplayer:sessionFinished', handleFinished);
+    socket.on('multiplayer:overviewUpdated', handleOverviewUpdated);
     socket.on('multiplayer:roundResult', () => {});
     socket.on('multiplayer:roundStarted', () => {});
 
     return () => {
-    socket.off('multiplayer:invite', handleInvite);
-    socket.off('multiplayer:sessionUpdated', () => {});
-    socket.off('multiplayer:sessionState', () => {});
-    socket.off('multiplayer:sessionFinished', handleFinished);
-    socket.off('multiplayer:roundResult', () => {});
+      socket.off('multiplayer:invite', handleInvite);
+      socket.off('multiplayer:sessionUpdated', () => {});
+      socket.off('multiplayer:sessionState', () => {});
+      socket.off('multiplayer:sessionFinished', handleFinished);
+      socket.off('multiplayer:overviewUpdated', handleOverviewUpdated);
+      socket.off('multiplayer:roundResult', () => {});
       socket.off('multiplayer:roundStarted', () => {});
 
       if (socket !== window.multiplayerSocket) {
@@ -176,7 +194,7 @@ export default function Multiplayer({ onShowNotification }) {
       }
       socketRef.current = null;
     };
-  }, [notify]);
+  }, [loadOverview, notify]);
 
   useEffect(() => {
     let mounted = true;
@@ -184,13 +202,14 @@ export default function Multiplayer({ onShowNotification }) {
     const init = async () => {
       if (!mounted) return;
       setLoading(true);
-      await Promise.all([loadDecks(), loadStoredSession()]);
+      await Promise.all([loadOverview(), loadDecks(), loadStoredSession()]);
       if (mounted) setLoading(false);
     };
 
     init();
 
     window.initMultiplayerPage = () => {
+      loadOverview();
       loadDecks();
       loadStoredSession();
     };
@@ -212,7 +231,7 @@ export default function Multiplayer({ onShowNotification }) {
     return () => {
       mounted = false;
     };
-  }, [loadDecks, loadStoredSession]);
+  }, [loadDecks, loadOverview, loadStoredSession]);
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -241,6 +260,7 @@ export default function Multiplayer({ onShowNotification }) {
         localStorage.setItem(CURRENT_SESSION_KEY, String(sessionPayload.session.id));
         attachSocketListeners(sessionPayload.session.id);
       }
+      await loadOverview();
       notify('Комната мультиплеера создана');
     } catch (error) {
       notify(error.message || 'Не удалось создать комнату', 'error');
@@ -266,6 +286,7 @@ export default function Multiplayer({ onShowNotification }) {
         attachSocketListeners(sessionPayload.session.id);
       }
       setJoinCode('');
+      await loadOverview();
       notify('Вы подключились к сессии');
       return true;
     } catch (error) {
@@ -291,6 +312,7 @@ export default function Multiplayer({ onShowNotification }) {
         setRoundNotice(null);
         setShowFinishedModal(true);
         localStorage.removeItem(CURRENT_SESSION_KEY);
+        await loadOverview();
         notify('Вы покинули лобби');
       } else {
         await api.multiplayer.leaveSession(sessionId);
@@ -302,6 +324,7 @@ export default function Multiplayer({ onShowNotification }) {
         setRoundNotice(null);
         setShowFinishedModal(true);
         localStorage.removeItem(CURRENT_SESSION_KEY);
+        await loadOverview();
         notify('Вы покинули лобби');
       }
     } catch (error) {
@@ -338,6 +361,7 @@ export default function Multiplayer({ onShowNotification }) {
         localStorage.setItem(CURRENT_SESSION_KEY, String(sessionPayload.session.id));
         attachSocketListeners(sessionPayload.session.id);
       }
+      await loadOverview();
       notify('Сессия запущена');
     } catch (error) {
       notify(error.message || 'Не удалось запустить сессию', 'error');
@@ -358,7 +382,7 @@ export default function Multiplayer({ onShowNotification }) {
       setRoundNotice(result);
       setAnswerValue('');
       if (result.allAnswered) {
-        await loadDecks();
+        await loadOverview();
       }
       return result;
     } catch (error) {
@@ -556,6 +580,16 @@ export default function Multiplayer({ onShowNotification }) {
           <p>
             Создавайте комнаты, приглашайте по логину или коду, проходите карточки синхронно и сравнивайте результат после каждого ответа.
           </p>
+        </div>
+        <div className="multiplayer-stat-strip" style={{ alignItems: 'flex-start', marginTop: '-8px' }}>
+          <div>
+            <span>Побед</span>
+            <strong>{overview.me?.wins || 0}</strong>
+          </div>
+          <div>
+            <span>Точность</span>
+            <strong>{overview.me?.accuracy || 0}%</strong>
+          </div>
         </div>
       </section>
 
