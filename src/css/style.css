@@ -318,6 +318,12 @@ body,
     box-shadow: var(--shadow);
 }
 
+.light-theme .multiplayer-hero {
+    background:
+        radial-gradient(circle at top left, rgba(236, 198, 126, 0.35), transparent 42%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 248, 250, 0.94));
+}
+
 .multiplayer-hero h1 {
     margin-bottom: 12px;
 }
@@ -341,6 +347,11 @@ body,
     letter-spacing: 0.02em;
 }
 
+.light-theme .multiplayer-badge {
+    background: rgba(236, 198, 126, 0.28);
+    border: 1px solid rgba(236, 198, 126, 0.4);
+}
+
 .multiplayer-stat-strip {
     display: grid;
     grid-template-columns: repeat(3, minmax(90px, 1fr));
@@ -357,6 +368,10 @@ body,
     padding: 16px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--border);
+}
+
+.light-theme .multiplayer-stat-strip div {
+    background: rgba(0, 0, 0, 0.05);
 }
 
 .multiplayer-stat-strip span {
