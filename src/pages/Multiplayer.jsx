@@ -651,7 +651,9 @@ export default function Multiplayer({ onShowNotification }) {
         }
       </div>);
 
-};
+  };
+
+  const myRank = overview.leaderboard.find((entry) => String(entry.user_id) === String(currentUser?.id));
 
   const session = activeSession?.session || null;
   const participants = activeSession?.participants || [];
@@ -888,6 +890,23 @@ export default function Multiplayer({ onShowNotification }) {
 
         <section className="multiplayer-card">
           <h2>Рейтинг</h2>
+          <div className="ranking-list">
+            {overview.leaderboard.map((entry) =>
+            <button key={entry.user_id} className={`ranking-row ${String(entry.user_id) === String(currentUser?.id) ? 'me' : ''}`} type="button">
+                <span className="ranking-position">#{entry.position}</span>
+                <span className="ranking-user">{entry.username}</span>
+                <span>{entry.wins} побед</span>
+                <span>{entry.accuracy}%</span>
+                <strong>{entry.points} очков</strong>
+              </button>
+            )}
+            {myRank ?
+            <div className="ranking-summary">
+                <span>Ваше место: #{myRank.position}</span>
+                <span>{myRank.points} очков</span>
+              </div> :
+            null}
+          </div>
         </section>
 
         <section className="multiplayer-card wide">
