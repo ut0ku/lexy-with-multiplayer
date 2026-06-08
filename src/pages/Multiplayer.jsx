@@ -27,7 +27,7 @@ function getStoredUser() {
 
 export default function Multiplayer({ onShowNotification }) {
   const [loading, setLoading] = useState(true);
-  const [overview, setOverview] = useState({ me: {} });
+  const [overview, setOverview] = useState({ leaderboard: [], me: {} });
   const [availableDecks, setAvailableDecks] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
@@ -61,6 +61,7 @@ export default function Multiplayer({ onShowNotification }) {
     try {
       const data = await api.multiplayer.getOverview();
       setOverview({
+        leaderboard: data.leaderboard || [],
         me: data.me || {}
       });
     } catch (error) {
@@ -590,6 +591,10 @@ const handleRoundResult = (payload) => {
             <span>Точность</span>
             <strong>{overview.me?.accuracy || 0}%</strong>
           </div>
+          <div>
+            <span>Очки</span>
+            <strong>{overview.me?.points || 0}</strong>
+          </div>
         </div>
       </section>
 
@@ -646,13 +651,14 @@ const handleRoundResult = (payload) => {
                 </div>
               </div>
 
-<div className="session-participants">
+              <div className="session-participants">
                 {participants.map((participant) =>
               <div key={participant.userId} className="participant-pill">
                     <strong>{participant.username}</strong>
                     <span>{participant.correctCount} верных</span>
+                    <span>{participant.score} очков</span>
                   </div>
-                )}
+              )}
               </div>
 
               {session?.status === 'active' && currentCard ?
@@ -673,7 +679,7 @@ const handleRoundResult = (payload) => {
                     <h2 style={{ marginBottom: '24px' }}>Игра завершена</h2>
                     
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
-                      {[...participants].sort((a, b) => b.correctCount - a.correctCount).map((participant, index) =>
+                      {[...participants].sort((a, b) => b.score - a.score).map((participant, index) =>
                   <div key={participant.userId} style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -690,6 +696,7 @@ const handleRoundResult = (payload) => {
                             <strong style={{ fontSize: '18px' }}>{participant.username}</strong>
                           </div>
                           <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontWeight: 'bold', fontSize: '18px', color: 'var(--text-primary)' }}>{participant.score} очков</div>
                             <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{participant.correctCount} верных</div>
                           </div>
                         </div>
@@ -735,6 +742,11 @@ const handleRoundResult = (payload) => {
           }
         </section>
 
+
+
+        <section className="multiplayer-card">
+          <h2>Рейтинг</h2>
+        </section>
 
       </div>
 
