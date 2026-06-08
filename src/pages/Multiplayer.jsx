@@ -32,6 +32,7 @@ export default function Multiplayer({ onShowNotification }) {
   const [pendingInvites, setPendingInvites] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
   const [selectedDeckId, setSelectedDeckId] = useState('');
+  const [mode, setMode] = useState('competitive');
   const [joinCode, setJoinCode] = useState('');
 
   const [answerValue, setAnswerValue] = useState('');
@@ -258,7 +259,7 @@ export default function Multiplayer({ onShowNotification }) {
 
     try {
       setSubmitting(true);
-      const result = await api.multiplayer.createSession(selectedDeckId, 'competitive', 'buttons');
+      const result = await api.multiplayer.createSession(selectedDeckId, mode, 'buttons');
       const sessionPayload = result.session;
       if (sessionPayload?.session?.id) {
         setActiveSession(sessionPayload);
@@ -660,6 +661,13 @@ export default function Multiplayer({ onShowNotification }) {
                     {deck.name}
                   </option>
                 )}
+              </select>
+            </label>
+            <label>
+              Режим
+              <select value={mode} onChange={(event) => setMode(event.target.value)}>
+                <option value="cooperative">Совместный</option>
+                <option value="competitive">Соревновательный</option>
               </select>
             </label>
             <button className="btn-primary" type="submit" disabled={submitting}>
