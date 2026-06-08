@@ -27,20 +27,17 @@ function getStoredUser() {
 
 export default function Multiplayer({ onShowNotification }) {
   const [loading, setLoading] = useState(true);
-  const [overview, setOverview] = useState({ leaderboard: [], history: [], activeSessions: [], me: {} });
+  const [defaultDeckId, setDefaultDeckId] = useState(null);
   const [availableDecks, setAvailableDecks] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
-  const [selectedDeckId, setSelectedDeckId] = useState('');
-  const [mode, setMode] = useState('competitive');
-  const [inputMode, setInputMode] = useState('buttons');
   const [joinCode, setJoinCode] = useState('');
-  const [inviteUsername, setInviteUsername] = useState('');
+
   const [answerValue, setAnswerValue] = useState('');
   const [roundNotice, setRoundNotice] = useState(null);
-  const [joinRoom, setJoinRoom] = useState(null);
+  const [showFinishedModal, setShowFinishedModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [showFinishedModal, setShowFinishedModal] = useState(true);
+  
   const socketRef = useRef(null);
   const previousSessionStatusRef = useRef(null);
 
@@ -59,41 +56,18 @@ export default function Multiplayer({ onShowNotification }) {
     socket.emit('multiplayer:joinRoom', { sessionId });
   }, []);
 
-  const loadOverview = useCallback(async () => {
-    try {
-      const data = await api.multiplayer.getOverview();
-      setOverview({
-        leaderboard: data.leaderboard || [],
-        history: data.history || [],
-        activeSessions: data.activeSessions || [],
-        me: data.me || {}
-      });
-    } catch (error) {
-      notify(error.message || 'Не удалось загрузить мультиплеер', 'error');
-    }
-  }, [notify]);
-
   const loadDecks = useCallback(async () => {
     try {
       const data = await api.getMyDecks();
       const decks = Array.isArray(data?.decks) ? data.decks : [];
       setAvailableDecks(decks);
-      if (!selectedDeckId && decks.length > 0) {
-        setSelectedDeckId(String(decks[0].id));
+      if (!defaultDeckId && decks.length > 0) {
+        setDefaultDeckId(String(decks[0].id));
       }
     } catch (error) {
       notify(error.message || 'Не удалось загрузить колоды', 'error');
     }
-  }, [notify, selectedDeckId]);
-
-  const loadInvites = useCallback(async () => {
-    try {
-      const data = await api.multiplayer.getInvites();
-      setPendingInvites(data.invites || []);
-    } catch (error) {
-      notify(error.message || 'Не удалось загрузить приглашения', 'error');
-    }
-  }, [notify]);
+  }, [notify, defaultDeckId]);
 
   const loadStoredSession = useCallback(async () => {
     const storedSessionId = localStorage.getItem(CURRENT_SESSION_KEY);
@@ -117,29 +91,8 @@ export default function Multiplayer({ onShowNotification }) {
         setActiveSession(data.session);
       }
     } catch (error) {
-
     }
   }, []);
-
-  useEffect(() => {
-    if (!activeSession?.session?.id) return undefined;
-
-    const sessionId = activeSession.session.id;
-    const timer = setInterval(() => {
-      syncSessionState(sessionId);
-      loadOverview();
-    }, 2500);
-
-    return () => clearInterval(timer);
-  }, [activeSession?.session?.id, loadOverview, syncSessionState]);
-
-  useEffect(() => {
-    const currentStatus = activeSession?.session?.status || null;
-    if (currentStatus === 'finished' && previousSessionStatusRef.current !== 'finished') {
-      setShowFinishedModal(true);
-    }
-    previousSessionStatusRef.current = currentStatus;
-  }, [activeSession?.session?.status]);
 
   useEffect(() => {
     const token = localStorage.getItem('lexy_token');
@@ -171,16 +124,12 @@ export default function Multiplayer({ onShowNotification }) {
     };
 
     const handleRoundResult = (payload) => {
-
       if (payload?.session) {
         if (String(payload.session.id) === String(localStorage.getItem(CURRENT_SESSION_KEY))) {
           syncSessionState(payload.session.id);
         }
       }
       setRoundNotice(payload);
-      if (payload?.currentAnswer && String(payload.currentAnswer.userId) === String(currentUser?.id)) {
-        notify('Ответ записан. Дождитесь ответов остальных участников.', 'accent');
-      }
     };
 
     const handleRoundStarted = (payload) => {
@@ -204,54 +153,30 @@ export default function Multiplayer({ onShowNotification }) {
         syncSessionState(payload.session.id);
       }
       setShowFinishedModal(true);
-      setRoundNotice(payload);
-      loadOverview();
-    };
-
-    const handleSessionDeleted = (payload) => {
-      if (!payload?.sessionId) return;
-
-      const storedSessionId = localStorage.getItem(CURRENT_SESSION_KEY);
-      if (String(storedSessionId) === String(payload.sessionId)) {
-        setActiveSession(null);
-        setRoundNotice(null);
-        setShowFinishedModal(true);
-        localStorage.removeItem(CURRENT_SESSION_KEY);
-      }
-
-      loadOverview();
-      notify('Комната удалена', 'accent');
-    };
-
-    const handleOverviewUpdated = () => {
-      loadOverview();
-    };
+    setRoundNotice(payload);
+  };
 
     socket.on('multiplayer:invite', handleInvite);
-    socket.on('multiplayer:sessionUpdated', handleSessionUpdated);
-    socket.on('multiplayer:sessionState', handleSessionState);
+    socket.on('multiplayer:sessionUpdated', () => {});
+    socket.on('multiplayer:sessionState', () => {});
     socket.on('multiplayer:sessionFinished', handleFinished);
-    socket.on('multiplayer:sessionDeleted', handleSessionDeleted);
-    socket.on('multiplayer:overviewUpdated', handleOverviewUpdated);
-    socket.on('multiplayer:roundResult', handleRoundResult);
-    socket.on('multiplayer:roundStarted', handleRoundStarted);
+    socket.on('multiplayer:roundResult', () => {});
+    socket.on('multiplayer:roundStarted', () => {});
 
     return () => {
-      socket.off('multiplayer:invite', handleInvite);
-      socket.off('multiplayer:sessionUpdated', handleSessionUpdated);
-      socket.off('multiplayer:sessionState', handleSessionState);
-      socket.off('multiplayer:sessionFinished', handleFinished);
-      socket.off('multiplayer:sessionDeleted', handleSessionDeleted);
-      socket.off('multiplayer:overviewUpdated', handleOverviewUpdated);
-      socket.off('multiplayer:roundResult', handleRoundResult);
-      socket.off('multiplayer:roundStarted', handleRoundStarted);
+    socket.off('multiplayer:invite', handleInvite);
+    socket.off('multiplayer:sessionUpdated', () => {});
+    socket.off('multiplayer:sessionState', () => {});
+    socket.off('multiplayer:sessionFinished', handleFinished);
+    socket.off('multiplayer:roundResult', () => {});
+      socket.off('multiplayer:roundStarted', () => {});
 
       if (socket !== window.multiplayerSocket) {
         socket.disconnect();
       }
       socketRef.current = null;
     };
-  }, [loadOverview, notify]);
+  }, [notify]);
 
   useEffect(() => {
     let mounted = true;
@@ -259,41 +184,63 @@ export default function Multiplayer({ onShowNotification }) {
     const init = async () => {
       if (!mounted) return;
       setLoading(true);
-      await Promise.all([loadOverview(), loadDecks(), loadInvites(), loadStoredSession()]);
+      await Promise.all([loadDecks(), loadStoredSession()]);
       if (mounted) setLoading(false);
     };
 
     init();
 
     window.initMultiplayerPage = () => {
-      loadOverview();
       loadDecks();
-      loadInvites();
       loadStoredSession();
     };
+
+    document.body.classList.add('dark-theme');
+    document.body.classList.remove('light-theme');
+
+    const enforceDarkTheme = () => {
+      document.body.classList.add('dark-theme');
+      document.body.classList.remove('light-theme');
+      const themeToggle = document.getElementById('themeToggle');
+      if (themeToggle) {
+        themeToggle.checked = false;
+      }
+    };
+
+    enforceDarkTheme();
 
     return () => {
       mounted = false;
     };
-  }, [loadDecks, loadInvites, loadOverview, loadStoredSession]);
+  }, [loadDecks, loadStoredSession]);
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      if (document.body.classList.contains('light-theme')) {
+        document.body.classList.remove('light-theme');
+        document.body.classList.add('dark-theme');
+      }
+    });
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   const handleCreateSession = async (event) => {
     event.preventDefault();
-    if (!selectedDeckId) {
-      notify('Выберите колоду', 'error');
+    if (!defaultDeckId) {
+      notify('Нет доступных колод', 'error');
       return;
     }
 
     try {
       setSubmitting(true);
-      const result = await api.multiplayer.createSession(selectedDeckId, mode, inputMode);
+      const result = await api.multiplayer.createSession(defaultDeckId, 'competitive', 'buttons');
       const sessionPayload = result.session;
       if (sessionPayload?.session?.id) {
         setActiveSession(sessionPayload);
         localStorage.setItem(CURRENT_SESSION_KEY, String(sessionPayload.session.id));
         attachSocketListeners(sessionPayload.session.id);
       }
-      await loadOverview();
       notify('Комната мультиплеера создана');
     } catch (error) {
       notify(error.message || 'Не удалось создать комнату', 'error');
@@ -319,7 +266,6 @@ export default function Multiplayer({ onShowNotification }) {
         attachSocketListeners(sessionPayload.session.id);
       }
       setJoinCode('');
-      await loadOverview();
       notify('Вы подключились к сессии');
       return true;
     } catch (error) {
@@ -328,96 +274,36 @@ export default function Multiplayer({ onShowNotification }) {
     } finally {
       setSubmitting(false);
     }
-  };
+};
 
-  const handleJoinRoomModalSubmit = async (event) => {
-    const joined = await handleJoinByCode(event);
-    if (joined) {
-      closeJoinRoomModal();
-    }
-  };
-
-  const openJoinRoomModal = (room) => {
-    if (!room?.code) return;
-    setJoinCode('');
-    setJoinRoom(room);
-  };
-
-  const closeJoinRoomModal = () => {
-    setJoinRoom(null);
-  };
-
-  const handleSendInvite = async (event) => {
-    event.preventDefault();
-    if (!activeSession?.session?.id) {
-      notify('Сначала создайте или откройте сессию', 'error');
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      await api.multiplayer.inviteByUsername(activeSession.session.id, inviteUsername);
-      setInviteUsername('');
-      await loadInvites();
-      notify('Приглашение отправлено');
-    } catch (error) {
-      notify(error.message || 'Не удалось отправить приглашение', 'error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeleteSession = async (sessionId, { confirm = true } = {}) => {
+  const handleLeaveLobby = async (sessionId) => {
     if (!sessionId) return;
-    if (confirm) {
-      const confirmed = window.confirm('Удалить комнату?');
-      if (!confirmed) return;
-    }
 
     try {
       setSubmitting(true);
-      await api.multiplayer.deleteSession(sessionId);
-      const currentSessionId = activeSession?.session?.id || localStorage.getItem(CURRENT_SESSION_KEY);
-      if (String(currentSessionId) === String(sessionId)) {
+      const isCreator = String(activeSession?.session?.hostUserId) === String(currentUser?.id);
+      if (isCreator) {
         const socket = socketRef.current;
         if (socket) {
           socket.emit('multiplayer:leaveRoom', { sessionId });
         }
         setActiveSession(null);
         setRoundNotice(null);
+        setShowFinishedModal(true);
         localStorage.removeItem(CURRENT_SESSION_KEY);
+        notify('Вы покинули лобби');
+      } else {
+        await api.multiplayer.leaveSession(sessionId);
+        const socket = socketRef.current;
+        if (socket) {
+          socket.emit('multiplayer:leaveRoom', { sessionId });
+        }
+        setActiveSession(null);
+        setRoundNotice(null);
+        setShowFinishedModal(true);
+        localStorage.removeItem(CURRENT_SESSION_KEY);
+        notify('Вы покинули лобби');
       }
-      await loadOverview();
-      notify('Комната удалена');
-    } catch (error) {
-      notify(error.message || 'Не удалось удалить комнату', 'error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleLeaveLobby = async (sessionId) => {
-    if (!sessionId) return;
-
-    const isCreator = String(activeSession?.session?.hostUserId) === String(currentUser?.id);
-    if (isCreator) {
-      await handleDeleteSession(sessionId, { confirm: false });
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      await api.multiplayer.leaveSession(sessionId);
-      const socket = socketRef.current;
-      if (socket) {
-        socket.emit('multiplayer:leaveRoom', { sessionId });
-      }
-      setActiveSession(null);
-      setRoundNotice(null);
-      setShowFinishedModal(true);
-      localStorage.removeItem(CURRENT_SESSION_KEY);
-      await loadOverview();
-      notify('Вы покинули лобби');
     } catch (error) {
       notify(error.message || 'Не удалось покинуть лобби', 'error');
     } finally {
@@ -428,7 +314,6 @@ export default function Multiplayer({ onShowNotification }) {
   const handleInviteAction = async (inviteId, action) => {
     try {
       const result = await api.multiplayer.respondToInvite(inviteId, action);
-      await loadInvites();
       if (action === 'accept' && result.session?.session?.id) {
         setActiveSession(result.session);
         localStorage.setItem(CURRENT_SESSION_KEY, String(result.session.session.id));
@@ -453,7 +338,6 @@ export default function Multiplayer({ onShowNotification }) {
         localStorage.setItem(CURRENT_SESSION_KEY, String(sessionPayload.session.id));
         attachSocketListeners(sessionPayload.session.id);
       }
-      await loadOverview();
       notify('Сессия запущена');
     } catch (error) {
       notify(error.message || 'Не удалось запустить сессию', 'error');
@@ -473,10 +357,8 @@ export default function Multiplayer({ onShowNotification }) {
       }
       setRoundNotice(result);
       setAnswerValue('');
-      if (!result.allAnswered) {
-        notify('Ответ записан. Дождитесь ответов остальных участников.', 'accent');
-      } else {
-        await loadOverview();
+      if (result.allAnswered) {
+        await loadDecks();
       }
       return result;
     } catch (error) {
@@ -657,18 +539,13 @@ export default function Multiplayer({ onShowNotification }) {
         }
       </div>);
 
-  };
-
-  const myRank = overview.leaderboard.find((entry) => String(entry.user_id) === String(currentUser?.id));
+};
 
   const session = activeSession?.session || null;
   const participants = activeSession?.participants || [];
   const currentCard = activeSession?.currentCard || null;
   const isHost = String(session?.hostUserId) === String(currentUser?.id);
-  const isAdmin = currentUser?.role === 'admin';
   const canStart = isHost && session?.status === 'waiting';
-  const canDelete = (isHost || isAdmin) && session?.status !== 'finished';
-  const historyNeedsScroll = overview.history.length > 3;
 
   return (
     <div className="multiplayer-page">
@@ -680,65 +557,26 @@ export default function Multiplayer({ onShowNotification }) {
             Создавайте комнаты, приглашайте по логину или коду, проходите карточки синхронно и сравнивайте результат после каждого ответа.
           </p>
         </div>
-        <div className="multiplayer-stat-strip">
-          <div>
-            <span>Побед</span>
-            <strong>{overview.me?.wins || 0}</strong>
-          </div>
-          <div>
-            <span>Точность</span>
-            <strong>{overview.me?.accuracy || 0}%</strong>
-          </div>
-          <div>
-            <span>Очки</span>
-            <strong>{overview.me?.points || 0}</strong>
-          </div>
-        </div>
       </section>
 
       <div className="multiplayer-grid">
         <section className="multiplayer-card">
           <h2>Создать комнату</h2>
           <form className="multiplayer-form" onSubmit={handleCreateSession}>
-            <label>
-              Колода
-              <select value={selectedDeckId} onChange={(event) => setSelectedDeckId(event.target.value)}>
-                <option value="">Выберите колоду</option>
-                {availableDecks.map((deck) =>
-                <option key={deck.id} value={deck.id}>
-                    {deck.name}
-                  </option>
-                )}
-              </select>
-            </label>
-            <label>
-              Режим
-              <select value={mode} onChange={(event) => setMode(event.target.value)}>
-                <option value="cooperative">Совместный</option>
-                <option value="competitive">Соревновательный</option>
-              </select>
-            </label>
-            <label>
-              Ответ
-              <select value={inputMode} onChange={(event) => setInputMode(event.target.value)}>
-                <option value="buttons">Знаю / не знаю</option>
-                <option value="text">Ввод с клавиатуры</option>
-              </select>
-            </label>
-            <button className="btn-primary" type="submit" disabled={submitting}>
+            <button className="btn-primary" type="submit" disabled={submitting || !defaultDeckId}>
               Создать сессию
             </button>
           </form>
         </section>
 
         <section className="multiplayer-card">
-          <h2>Подключиться по коду</h2>
+          <h2 style={{ marginLeft: '3px' }}>Подключиться по коду</h2>
           <form className="multiplayer-form" onSubmit={handleJoinByCode}>
             <label>
               Код комнаты
-              <input value={joinCode} onChange={(event) => setJoinCode(event.target.value)} placeholder="Например, A1B2C3" />
+              <input value={joinCode} onChange={(event) => setJoinCode(event.target.value)} placeholder="Например, A1B2C3" style={{ marginTop: '12px', marginLeft: '-4px' }} />
             </label>
-            <button className="btn-outline" type="submit" disabled={submitting}>
+              <button className="btn-outline" type="submit" disabled={submitting} style={{ marginLeft: '-6px' }}>
               Подключиться
             </button>
           </form>
@@ -751,41 +589,25 @@ export default function Multiplayer({ onShowNotification }) {
               <div className="session-meta">
                 <span>Код: {session?.code}</span>
                 <span>Режим: {session?.mode === 'competitive' ? 'соревновательный' : 'совместный'}</span>
-                <span>Ответ: {session?.inputMode === 'text' ? 'клавиатура' : 'кнопки'}</span>
-                <span>Статус: {session?.status}</span>
               </div>
 
-              <div className="session-toolbar">
-                <form className="invite-inline-form" onSubmit={handleSendInvite}>
-                  <input
-                  value={inviteUsername}
-                  onChange={(event) => setInviteUsername(event.target.value)}
-                  placeholder="Логин участника" />
-                
-                  <button className="btn-outline invite-button" type="submit" disabled={submitting}>Пригласить</button>
-                </form>
+              <div className="session-toolbar" style={{ marginBottom: '-4px' }}>
                 <div className="session-toolbar-actions">
                   {canStart &&
-                <button className="btn-primary" type="button" onClick={handleStartSession} disabled={submitting}>
+                  <button className="btn-primary" type="button" onClick={handleStartSession} disabled={submitting}>
                       Запустить сессию
                     </button>
-                }
-                  {canDelete &&
-                <button className="btn-incorrect" type="button" onClick={() => handleDeleteSession(session.id)} disabled={submitting}>
-                      Удалить комнату
-                    </button>
-                }
+                  }
                 </div>
               </div>
 
-              <div className="session-participants">
+<div className="session-participants" style={{ marginTop: '-18px' }}>
                 {participants.map((participant) =>
               <div key={participant.userId} className="participant-pill">
                     <strong>{participant.username}</strong>
                     <span>{participant.correctCount} верных</span>
-                    <span>{participant.score} очков</span>
                   </div>
-              )}
+                )}
               </div>
 
               {session?.status === 'active' && currentCard ?
@@ -806,7 +628,7 @@ export default function Multiplayer({ onShowNotification }) {
                     <h2 style={{ marginBottom: '24px' }}>Игра завершена</h2>
                     
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
-                      {[...participants].sort((a, b) => b.score - a.score).map((participant, index) =>
+                      {[...participants].sort((a, b) => b.correctCount - a.correctCount).map((participant, index) =>
                   <div key={participant.userId} style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -823,7 +645,6 @@ export default function Multiplayer({ onShowNotification }) {
                             <strong style={{ fontSize: '18px' }}>{participant.username}</strong>
                           </div>
                           <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontWeight: 'bold', fontSize: '18px', color: 'var(--text-primary)' }}>{participant.score} очков</div>
                             <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{participant.correctCount} верных</div>
                           </div>
                         </div>
@@ -869,146 +690,11 @@ export default function Multiplayer({ onShowNotification }) {
           }
         </section>
 
-        <section className="multiplayer-card">
-          <h2>Приглашения</h2>
-          <div className="invite-list">
-            {pendingInvites.length === 0 ?
-            <p className="empty-note">Сейчас нет приглашений.</p> :
 
-            pendingInvites.map((invite) =>
-            <div key={invite.id} className="invite-item">
-                  <strong>{invite.inviter_username}</strong>
-                  <span>Комната {invite.session_code}</span>
-                  <span>{invite.deck_name}</span>
-                  <div className="invite-actions">
-                    <button className="btn-primary" onClick={() => handleInviteAction(invite.id, 'accept')}>
-                      Принять
-                    </button>
-                    <button className="btn-outline" onClick={() => handleInviteAction(invite.id, 'decline')}>
-                      Отклонить
-                    </button>
-                  </div>
-                </div>
-            )
-            }
-          </div>
-        </section>
-
-        <section className="multiplayer-card">
-          <h2>Рейтинг</h2>
-          <div className="ranking-list">
-            {overview.leaderboard.map((entry) =>
-            <button key={entry.user_id} className={`ranking-row ${String(entry.user_id) === String(currentUser?.id) ? 'me' : ''}`} type="button">
-                <span className="ranking-position">#{entry.position}</span>
-                <span className="ranking-user">{entry.username}</span>
-                <span>{entry.wins} побед</span>
-                <span>{entry.accuracy}%</span>
-                <strong>{entry.points} очков</strong>
-              </button>
-            )}
-            {myRank ?
-            <div className="ranking-summary">
-                <span>Ваше место: #{myRank.position}</span>
-                <span>{myRank.points} очков</span>
-              </div> :
-            null}
-          </div>
-        </section>
-
-        <section className="multiplayer-card wide">
-          <h2>История сессий</h2>
-          <div className={`history-list ${historyNeedsScroll ? 'scrollable' : ''}`}>
-            {overview.history.length === 0 ?
-            <p className="empty-note">История пока пуста.</p> :
-
-            overview.history.map((entry) =>
-            <div key={entry.id} className="history-item">
-                  <div>
-                    <strong>{entry.deck_name}</strong>
-                    <p>{entry.mode === 'competitive' ? 'Соревновательный' : 'Совместный'} • {entry.input_mode === 'text' ? 'клавиатура' : 'кнопки'}</p>
-                  </div>
-                  <div className="history-meta">
-                    <span>{new Date(entry.created_at).toLocaleString('ru-RU')}</span>
-                    <span>{entry.status}</span>
-                  </div>
-                  <div className="history-participants">
-                    {(entry.participants || []).map((participant) =>
-                <span key={participant.id}>{participant.username}: {participant.score} очков</span>
-                )}
-                  </div>
-                </div>
-            )
-            }
-          </div>
-        </section>
       </div>
 
-      <section className="multiplayer-card wide">
-        <h2>Активные комнаты</h2>
-        <div className="active-session-list">
-          {overview.activeSessions.length === 0 ?
-          <p className="empty-note">Нет активных комнат.</p> :
 
-          overview.activeSessions.map((entry) =>
-          <button
-            key={entry.id}
-            className="active-session-row"
-            type="button"
-            onClick={() => openJoinRoomModal(entry)}
-            aria-label={`Подключиться к комнате ${entry.code}`}>
-            
-                <div className="active-session-main">
-                  <div className="active-session-head">
-                    <span className="active-session-label">Nickname:</span>
-                    <span className="active-session-label">Deck:</span>
-                  </div>
-                  <div className="active-session-values">
-                    <strong>{entry.host_username || entry.host_name || 'Пользователь'}</strong>
-                    <strong>{entry.deck_name}</strong>
-                  </div>
-                </div>
-              </button>
-          )
-          }
-        </div>
-      </section>
-
-      {joinRoom ?
-      <div className="modal-overlay active" onClick={closeJoinRoomModal}>
-          <div className="modal-content multiplayer-join-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Подключиться к комнате</h2>
-              <span className="close-btn" onClick={closeJoinRoomModal}>×</span>
-            </div>
-            <div className="modal-body">
-              <div className="join-room-summary">
-                <div>
-                  <strong>Nickname:</strong>
-                  <span>{joinRoom.host_username || joinRoom.host_name || 'Пользователь'}</span>
-                </div>
-                <div>
-                  <strong>Deck:</strong>
-                  <span>{joinRoom.deck_name}</span>
-                </div>
-              </div>
-              <form className="multiplayer-form" onSubmit={handleJoinRoomModalSubmit}>
-                <label>
-                  Код комнаты
-                  <input value={joinCode} onChange={(event) => setJoinCode(event.target.value)} placeholder="Введите код комнаты" />
-                </label>
-                <button className="btn-primary" type="submit" disabled={submitting}>
-                  Подключиться
-                </button>
-              </form>
-              {canDelete ?
-            <button className="btn-incorrect modal-room-delete" type="button" onClick={() => handleDeleteSession(joinRoom.id)} disabled={submitting}>
-                  Удалить комнату
-                </button> :
-            null}
-            </div>
-          </div>
-        </div> :
-      null}
     </div>);
 
 }
+
