@@ -207,7 +207,7 @@ async function buildSessionPayload(pool, sessionId, viewerUserId = null) {
 async function updateLeaderboard(pool, sessionId, winnerUserId = null) {
     const participants = await loadParticipants(pool, sessionId);
     for (const participant of participants) {
-        const pointsDelta = 0;
+        const pointsDelta = participant.score || 0;
         const winsDelta = winnerUserId && Number(winnerUserId) === Number(participant.user_id) ? 1 : 0;
         await pool.query(
             `INSERT INTO multiplayer_user_stats (
@@ -236,6 +236,8 @@ async function updateLeaderboard(pool, sessionId, winnerUserId = null) {
 function determineWinner(participants) {
     return participants.reduce((best, current) => {
         if (!best) return current;
+        if ((current.score || 0) > (best.score || 0)) return current;
+        if ((current.score || 0) < (best.score || 0)) return best;
         if ((current.correct_count || 0) > (best.correct_count || 0)) return current;
         if ((current.correct_count || 0) < (best.correct_count || 0)) return best;
         if ((current.total_time_ms || Number.MAX_SAFE_INTEGER) < (best.total_time_ms || Number.MAX_SAFE_INTEGER)) return current;
@@ -319,7 +321,7 @@ async function registerMultiplayer({ app, pool, io, authenticateToken, connected
         return { session, participants };
     };
 
-app.get('/api/multiplayer/overview', authenticateToken, async (req, res) => {
+    app.get('/api/multiplayer/overview', authenticateToken, async (req, res) => {
         try {
             const stats = await pool.query(
                 `SELECT COALESCE(us.wins, 0) AS wins,
@@ -328,11 +330,51 @@ app.get('/api/multiplayer/overview', authenticateToken, async (req, res) => {
                         COALESCE(us.points, 0) AS points,
                         COALESCE(us.sessions_played, 0) AS sessions_played,
                         COALESCE(us.total_time_ms, 0) AS total_time_ms,
-                        COALESCE(ROUND((us.correct_answers::numeric / NULLIF(us.total_answers, 0)) * 100, 1), 0) AS accuracy
-                 FROM multiplayer_user_stats us
-                 WHERE us.user_id = $1`,
+                        COALESCE(ROUND((us.correct_answers::numeric / NULLIF(us.total_answers, 0)) * 100, 1), 0) AS accuracy,
+                        ranked.position
+                 FROM users u
+                 LEFT JOIN multiplayer_user_stats us ON us.user_id = u.id
+                 LEFT JOIN (
+                    SELECT user_id, ROW_NUMBER() OVER (ORDER BY points DESC, wins DESC, correct_answers DESC, total_time_ms ASC) AS position
+                    FROM multiplayer_user_stats
+                 ) ranked ON ranked.user_id = u.id
+                 WHERE u.id = $1`,
                 [req.user.id]
             );
+
+            const leaderboard = await pool.query(
+                `SELECT ranked.position,
+                        ranked.user_id,
+                        ranked.username,
+                        ranked.name,
+                        ranked.avatar,
+                        ranked.wins,
+                        ranked.correct_answers,
+                        ranked.total_answers,
+                        ranked.points,
+                        ranked.sessions_played,
+                        ranked.total_time_ms,
+                        ranked.accuracy
+                 FROM (
+                    SELECT u.id AS user_id,
+                           u.username,
+                           u.name,
+                           u.avatar,
+                           COALESCE(us.wins, 0) AS wins,
+                           COALESCE(us.correct_answers, 0) AS correct_answers,
+                           COALESCE(us.total_answers, 0) AS total_answers,
+                           COALESCE(us.points, 0) AS points,
+                           COALESCE(us.sessions_played, 0) AS sessions_played,
+                           COALESCE(us.total_time_ms, 0) AS total_time_ms,
+                           COALESCE(ROUND((us.correct_answers::numeric / NULLIF(us.total_answers, 0)) * 100, 1), 0) AS accuracy,
+                           ROW_NUMBER() OVER (ORDER BY COALESCE(us.points, 0) DESC, COALESCE(us.wins, 0) DESC, COALESCE(us.correct_answers, 0) DESC, COALESCE(us.total_time_ms, 0) ASC) AS position
+                    FROM users u
+                    LEFT JOIN multiplayer_user_stats us ON us.user_id = u.id
+                 ) ranked
+                 ORDER BY ranked.position
+                 LIMIT 20`
+            );
+
 
             const recentSessions = await pool.query(
                 `SELECT s.id,
@@ -368,9 +410,10 @@ app.get('/api/multiplayer/overview', authenticateToken, async (req, res) => {
                     points: 0,
                     sessions_played: 0,
                     total_time_ms: 0,
-                    accuracy: 0
+                    accuracy: 0,
+                    position: null
                 },
-                leaderboard: [],
+                leaderboard: leaderboard.rows,
                 activeSessions: recentSessions.rows
             });
         } catch (error) {
@@ -757,7 +800,9 @@ app.get('/api/multiplayer/overview', authenticateToken, async (req, res) => {
                 ? normalizeText(answerText) === normalizeText(currentCard.back)
                 : normalizeText(answerText) === 'know';
 
-            const scoreDelta = 0;
+            const scoreDelta = session.mode === 'competitive'
+                ? (isCorrect ? Math.max(25, 1000 - Math.floor(responseMs / 12)) : 0)
+                : (isCorrect ? 1 : 0);
 
             await pool.query('BEGIN');
 
@@ -773,9 +818,10 @@ app.get('/api/multiplayer/overview', authenticateToken, async (req, res) => {
                  SET correct_count = correct_count + $1,
                      incorrect_count = incorrect_count + $2,
                      total_time_ms = total_time_ms + $3,
+                     score = score + $4,
                      last_seen_at = CURRENT_TIMESTAMP
-                 WHERE id = $4`,
-                [isCorrect ? 1 : 0, isCorrect ? 0 : 1, responseMs, participant.id]
+                 WHERE id = $5`,
+                [isCorrect ? 1 : 0, isCorrect ? 0 : 1, responseMs, scoreDelta, participant.id]
             );
 
             await pool.query('COMMIT');
@@ -822,9 +868,52 @@ app.get('/api/multiplayer/overview', authenticateToken, async (req, res) => {
         } catch (error) {
             await pool.query('ROLLBACK').catch(() => {});
             console.error('multiplayer answer error:', error);
-res.status(500).json({ error: 'Ошибка сервера' });
+            res.status(500).json({ error: 'Ошибка сервера' });
         }
     });
+
+    app.get('/api/multiplayer/leaderboard', authenticateToken, async (req, res) => {
+        try {
+            const result = await pool.query(
+                `SELECT ranked.position,
+                        ranked.user_id,
+                        ranked.username,
+                        ranked.name,
+                        ranked.avatar,
+                        ranked.wins,
+                        ranked.correct_answers,
+                        ranked.total_answers,
+                        ranked.points,
+                        ranked.sessions_played,
+                        ranked.total_time_ms,
+                        ranked.accuracy
+                 FROM (
+                    SELECT u.id AS user_id,
+                           u.username,
+                           u.name,
+                           u.avatar,
+                           COALESCE(us.wins, 0) AS wins,
+                           COALESCE(us.correct_answers, 0) AS correct_answers,
+                           COALESCE(us.total_answers, 0) AS total_answers,
+                           COALESCE(us.points, 0) AS points,
+                           COALESCE(us.sessions_played, 0) AS sessions_played,
+                           COALESCE(us.total_time_ms, 0) AS total_time_ms,
+                           COALESCE(ROUND((us.correct_answers::numeric / NULLIF(us.total_answers, 0)) * 100, 1), 0) AS accuracy,
+                           ROW_NUMBER() OVER (ORDER BY COALESCE(us.points, 0) DESC, COALESCE(us.wins, 0) DESC, COALESCE(us.correct_answers, 0) DESC, COALESCE(us.total_time_ms, 0) ASC) AS position
+                    FROM users u
+                    LEFT JOIN multiplayer_user_stats us ON us.user_id = u.id
+                 ) ranked
+                 ORDER BY ranked.position
+                 LIMIT 50`
+            );
+            res.json({ leaderboard: result.rows });
+        } catch (error) {
+            console.error('multiplayer leaderboard error:', error);
+            res.status(500).json({ error: 'Ошибка сервера' });
+        }
+    });
+
+
 
     io.on('connection', (socket) => {
         socket.on('multiplayer:joinRoom', async ({ sessionId }) => {

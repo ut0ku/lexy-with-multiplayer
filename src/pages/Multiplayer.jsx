@@ -137,13 +137,17 @@ if (data?.session) {
       setRoundNotice(payload);
     };
 
-const handleRoundResult = (payload) => {
+    const handleRoundResult = (payload) => {
+
       if (payload?.session) {
         if (String(payload.session.id) === String(localStorage.getItem(CURRENT_SESSION_KEY))) {
           syncSessionState(payload.session.id);
         }
       }
       setRoundNotice(payload);
+      if (payload?.currentAnswer && String(payload.currentAnswer.userId) === String(currentUser?.id)) {
+        notify('Ответ записан. Дождитесь ответов остальных участников.', 'accent');
+      }
     };
 
     const handleRoundStarted = (payload) => {
@@ -382,7 +386,9 @@ const handleRoundResult = (payload) => {
       }
       setRoundNotice(result);
       setAnswerValue('');
-      if (result.allAnswered) {
+      if (!result.allAnswered) {
+        notify('Ответ записан. Дождитесь ответов остальных участников.', 'accent');
+      } else {
         await loadOverview();
       }
       return result;
@@ -755,5 +761,4 @@ const handleRoundResult = (payload) => {
     </div>);
 
 }
-
 

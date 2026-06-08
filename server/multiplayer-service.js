@@ -464,6 +464,8 @@ async function finalizeSession({ mpPool, mainPool = null }, sessionId) {
     const winner = session.mode === 'competitive'
         ? participants.reduce((best, current) => {
             if (!best) return current;
+            if ((current.score || 0) > (best.score || 0)) return current;
+            if ((current.score || 0) < (best.score || 0)) return best;
             if ((current.correct_count || 0) > (best.correct_count || 0)) return current;
             if ((current.correct_count || 0) < (best.correct_count || 0)) return best;
             if ((current.total_time_ms || Number.MAX_SAFE_INTEGER) < (best.total_time_ms || Number.MAX_SAFE_INTEGER)) return current;
@@ -493,13 +495,13 @@ async function finalizeSession({ mpPool, mainPool = null }, sessionId) {
                 sessions_played = multiplayer_user_stats.sessions_played + 1,
                 updated_at = CURRENT_TIMESTAMP`,
             [
-            participant.user_id,
-            winsDelta,
-            participant.correct_count,
-            participant.correct_count + participant.incorrect_count,
-            0,
-            participant.total_time_ms
-        ]
+                participant.user_id,
+                winsDelta,
+                participant.correct_count,
+                participant.correct_count + participant.incorrect_count,
+                participant.score,
+                participant.total_time_ms
+            ]
         );
     }
 
@@ -589,18 +591,42 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
 
     app.get('/api/multiplayer/overview', authenticateToken, async (req, res) => {
         try {
-            const myStats = await mpPool.query(
-                `SELECT COALESCE(wins, 0) AS wins,
-                        COALESCE(correct_answers, 0) AS correct_answers,
-                        COALESCE(total_answers, 0) AS total_answers,
-                        COALESCE(points, 0) AS points,
-                        COALESCE(sessions_played, 0) AS sessions_played,
-                        COALESCE(total_time_ms, 0) AS total_time_ms,
+            const statsResult = await mpPool.query(
+                `SELECT user_id, wins, correct_answers, total_answers, points, sessions_played, total_time_ms,
                         COALESCE(ROUND((correct_answers::numeric / NULLIF(total_answers, 0)) * 100, 1), 0) AS accuracy
                  FROM multiplayer_user_stats
-                 WHERE user_id = $1`,
-                [req.user.id]
+                 ORDER BY points DESC, wins DESC, correct_answers DESC, total_time_ms ASC`
             );
+
+            const users = await fetchUsersByIds(mpPool, statsResult.rows.map((row) => row.user_id), mainPool);
+            const leaderboard = statsResult.rows.map((row, index) => {
+                const user = users.get(Number(row.user_id));
+                return {
+                    position: index + 1,
+                    user_id: row.user_id,
+                    username: user?.username || 'unknown',
+                    name: user?.name || 'Пользователь',
+                    avatar: user?.avatar || '👤',
+                    wins: row.wins,
+                    correct_answers: row.correct_answers,
+                    total_answers: row.total_answers,
+                    points: row.points,
+                    sessions_played: row.sessions_played,
+                    total_time_ms: row.total_time_ms,
+                    accuracy: row.accuracy
+                };
+            });
+
+            const myStats = statsResult.rows.find((row) => Number(row.user_id) === Number(req.user.id)) || {
+                wins: 0,
+                correct_answers: 0,
+                total_answers: 0,
+                points: 0,
+                sessions_played: 0,
+                total_time_ms: 0,
+                accuracy: 0
+            };
+            const myPosition = leaderboard.find((row) => Number(row.user_id) === Number(req.user.id));
 
             const activeResult = await mpPool.query(
                 `SELECT s.id,
@@ -627,16 +653,10 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
 
             res.json({
                 me: {
-                    wins: myStats.rows[0]?.wins || 0,
-                    correct_answers: myStats.rows[0]?.correct_answers || 0,
-                    total_answers: myStats.rows[0]?.total_answers || 0,
-                    points: myStats.rows[0]?.points || 0,
-                    sessions_played: myStats.rows[0]?.sessions_played || 0,
-                    total_time_ms: myStats.rows[0]?.total_time_ms || 0,
-                    accuracy: myStats.rows[0]?.accuracy || 0,
-                    position: null
+                    ...myStats,
+                    position: myPosition?.position || null
                 },
-                leaderboard: [],
+                leaderboard,
                 activeSessions: activeResult.rows.map((session) => ({
                     id: session.id,
                     code: session.code,
@@ -1043,14 +1063,17 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
                 const normalizedCandidates = allCandidates.map(normalizeText);
                 isCorrect = normalizedCandidates.includes(normalizedAnswer);
             } else {
-isCorrect = normalizeText(answerText) === 'know';
-             }
-             const scoreDelta = 0;
-             await mpPool.query('BEGIN');
+                isCorrect = normalizeText(answerText) === 'know';
+            }
+            const scoreDelta = session.mode === 'competitive'
+                ? (isCorrect ? Math.max(25, 1000 - Math.floor(responseMs / 12)) : 0)
+                : (isCorrect ? 1 : 0);
+
+            await mpPool.query('BEGIN');
             await mpPool.query(
                 `INSERT INTO multiplayer_session_answers (
                     session_id, participant_id, card_index, answer_text, is_correct, response_ms
-                ) VALUES ($1, $2, $3, $4, $5, $6)`,
+                 ) VALUES ($1, $2, $3, $4, $5, $6)`,
                 [sessionId, participant.id, session.current_card_index, answerText, isCorrect, responseMs]
             );
             await mpPool.query(
@@ -1058,9 +1081,10 @@ isCorrect = normalizeText(answerText) === 'know';
                  SET correct_count = correct_count + $1,
                      incorrect_count = incorrect_count + $2,
                      total_time_ms = total_time_ms + $3,
+                     score = score + $4,
                      last_seen_at = CURRENT_TIMESTAMP
-                WHERE id = $4`,
-                [isCorrect ? 1 : 0, isCorrect ? 0 : 1, responseMs, participant.id]
+                 WHERE id = $5`,
+                [isCorrect ? 1 : 0, isCorrect ? 0 : 1, responseMs, scoreDelta, participant.id]
             );
             await mpPool.query('COMMIT');
 
@@ -1107,6 +1131,39 @@ isCorrect = normalizeText(answerText) === 'know';
         } catch (error) {
             await mpPool.query('ROLLBACK').catch(() => {});
             console.error('multiplayer answer error:', error);
+            res.status(500).json({ error: 'Ошибка сервера' });
+        }
+    });
+
+    app.get('/api/multiplayer/leaderboard', authenticateToken, async (req, res) => {
+        try {
+            const result = await mpPool.query(
+                `SELECT user_id, wins, correct_answers, total_answers, points, sessions_played, total_time_ms,
+                        COALESCE(ROUND((correct_answers::numeric / NULLIF(total_answers, 0)) * 100, 1), 0) AS accuracy
+                 FROM multiplayer_user_stats
+                 ORDER BY points DESC, wins DESC, correct_answers DESC, total_time_ms ASC
+                 LIMIT 50`
+            );
+
+            const users = await fetchUsersByIds(mpPool, result.rows.map((row) => row.user_id), mainPool);
+            res.json({
+                leaderboard: result.rows.map((row, index) => ({
+                    position: index + 1,
+                    user_id: row.user_id,
+                    username: users.get(Number(row.user_id))?.username || 'unknown',
+                    name: users.get(Number(row.user_id))?.name || 'Пользователь',
+                    avatar: users.get(Number(row.user_id))?.avatar || '👤',
+                    wins: row.wins,
+                    correct_answers: row.correct_answers,
+                    total_answers: row.total_answers,
+                    points: row.points,
+                    sessions_played: row.sessions_played,
+                    total_time_ms: row.total_time_ms,
+                    accuracy: row.accuracy
+                }))
+            });
+        } catch (error) {
+            console.error('multiplayer leaderboard error:', error);
             res.status(500).json({ error: 'Ошибка сервера' });
         }
     });
