@@ -27,7 +27,7 @@ function getStoredUser() {
 
 export default function Multiplayer({ onShowNotification }) {
   const [loading, setLoading] = useState(true);
-  const [overview, setOverview] = useState({ leaderboard: [], me: {} });
+  const [overview, setOverview] = useState({ leaderboard: [], activeSessions: [], me: {} });
   const [availableDecks, setAvailableDecks] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
@@ -36,7 +36,7 @@ export default function Multiplayer({ onShowNotification }) {
 
   const [answerValue, setAnswerValue] = useState('');
   const [roundNotice, setRoundNotice] = useState(null);
-  const [showFinishedModal, setShowFinishedModal] = useState(false);
+  const [joinRoom, setJoinRoom] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   
   const socketRef = useRef(null);
@@ -62,6 +62,7 @@ export default function Multiplayer({ onShowNotification }) {
       const data = await api.multiplayer.getOverview();
       setOverview({
         leaderboard: data.leaderboard || [],
+        activeSessions: data.activeSessions || [],
         me: data.me || {}
       });
     } catch (error) {
@@ -299,6 +300,24 @@ export default function Multiplayer({ onShowNotification }) {
       setSubmitting(false);
     }
   };
+
+  const handleJoinRoomModalSubmit = async (event) => {
+    const joined = await handleJoinByCode(event);
+    if (joined) {
+      closeJoinRoomModal();
+    }
+  };
+
+  const openJoinRoomModal = (room) => {
+    if (!room?.code) return;
+    setJoinCode('');
+    setJoinRoom(room);
+  };
+
+  const closeJoinRoomModal = () => {
+    setJoinRoom(null);
+  };
+
 
 
   const handleDeleteSession = async (sessionId, { confirm = true } = {}) => {
@@ -784,7 +803,72 @@ export default function Multiplayer({ onShowNotification }) {
 
       </div>
 
+      <section className="multiplayer-card wide">
+        <h2>Активные комнаты</h2>
+        <div className="active-session-list">
+          {overview.activeSessions.length === 0 ?
+          <p className="empty-note">Нет активных комнат.</p> :
 
+          overview.activeSessions.map((entry) =>
+          <button
+            key={entry.id}
+            className="active-session-row"
+            type="button"
+            onClick={() => openJoinRoomModal(entry)}
+            aria-label={`Подключиться к комнате ${entry.code}`}>
+            
+                <div className="active-session-main">
+                  <div className="active-session-head">
+                    <span className="active-session-label">Nickname:</span>
+                    <span className="active-session-label">Deck:</span>
+                  </div>
+                  <div className="active-session-values">
+                    <strong>{entry.host_username || entry.host_name || 'Пользователь'}</strong>
+                    <strong>{entry.deck_name}</strong>
+                  </div>
+                </div>
+              </button>
+          )
+          }
+        </div>
+      </section>
+
+      {joinRoom ?
+      <div className="modal-overlay active" onClick={closeJoinRoomModal}>
+          <div className="modal-content multiplayer-join-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Подключиться к комнате</h2>
+              <span className="close-btn" onClick={closeJoinRoomModal}>×</span>
+            </div>
+            <div className="modal-body">
+              <div className="join-room-summary">
+                <div>
+                  <strong>Nickname:</strong>
+                  <span>{joinRoom.host_username || joinRoom.host_name || 'Пользователь'}</span>
+                </div>
+                <div>
+                  <strong>Deck:</strong>
+                  <span>{joinRoom.deck_name}</span>
+                </div>
+              </div>
+              <form className="multiplayer-form" onSubmit={handleJoinRoomModalSubmit}>
+                <label>
+                  Код комнаты
+                  <input value={joinCode} onChange={(event) => setJoinCode(event.target.value)} placeholder="Введите код комнаты" />
+                </label>
+                <button className="btn-primary" type="submit" disabled={submitting}>
+                  Подключиться
+                </button>
+              </form>
+              {canDelete ?
+            <button className="btn-incorrect modal-room-delete" type="button" onClick={() => handleDeleteSession(joinRoom.id)} disabled={submitting}>
+                  Удалить комнату
+                </button> :
+            null}
+            </div>
+          </div>
+        </div> :
+      null}
     </div>);
 
 }
