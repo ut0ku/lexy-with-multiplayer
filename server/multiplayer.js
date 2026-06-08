@@ -484,6 +484,10 @@ async function registerMultiplayer({ app, pool, io, authenticateToken, connected
                 [deckId]
             );
 
+            if (cardsResult.rows.length === 0) {
+                return res.status(400).json({ error: 'В колоде нет карточек' });
+            }
+
             let code = generateSessionCode();
             let existing = await client.query('SELECT id FROM multiplayer_sessions WHERE code = $1', [code]);
             while (existing.rows.length > 0) {

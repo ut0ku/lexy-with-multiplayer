@@ -738,6 +738,9 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
             }
 
             const cards = await fetchDeckCards(mpPool, deckId);
+            if (cards.length === 0) {
+                return res.status(400).json({ error: 'В колоде нет карточек' });
+            }
 
             let code = generateSessionCode();
             let codeCheck = await client.query('SELECT id FROM multiplayer_sessions WHERE code = $1', [code]);
