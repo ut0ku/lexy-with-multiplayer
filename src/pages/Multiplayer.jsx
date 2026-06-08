@@ -35,7 +35,7 @@ export default function Multiplayer({ onShowNotification }) {
   const [mode, setMode] = useState('competitive');
   const [inputMode, setInputMode] = useState('buttons');
   const [joinCode, setJoinCode] = useState('');
-
+  const [inviteUsername, setInviteUsername] = useState('');
   const [answerValue, setAnswerValue] = useState('');
   const [roundNotice, setRoundNotice] = useState(null);
   const [joinRoom, setJoinRoom] = useState(null);
@@ -85,6 +85,15 @@ export default function Multiplayer({ onShowNotification }) {
       notify(error.message || 'Не удалось загрузить колоды', 'error');
     }
   }, [notify, selectedDeckId]);
+
+  const loadInvites = useCallback(async () => {
+    try {
+      const data = await api.multiplayer.getInvites();
+      setPendingInvites(data.invites || []);
+    } catch (error) {
+      notify(error.message || 'Не удалось загрузить приглашения', 'error');
+    }
+  }, [notify]);
 
   const loadStoredSession = useCallback(async () => {
     const storedSessionId = localStorage.getItem(CURRENT_SESSION_KEY);
@@ -244,7 +253,7 @@ export default function Multiplayer({ onShowNotification }) {
     const init = async () => {
       if (!mounted) return;
       setLoading(true);
-      await Promise.all([loadOverview(), loadDecks(), loadStoredSession()]);
+      await Promise.all([loadOverview(), loadDecks(), loadInvites(), loadStoredSession()]);
       if (mounted) setLoading(false);
     };
 
@@ -253,13 +262,14 @@ export default function Multiplayer({ onShowNotification }) {
     window.initMultiplayerPage = () => {
       loadOverview();
       loadDecks();
+      loadInvites();
       loadStoredSession();
     };
 
     return () => {
       mounted = false;
     };
-  }, [loadDecks, loadOverview, loadStoredSession]);
+  }, [loadDecks, loadInvites, loadOverview, loadStoredSession]);
 
   const handleCreateSession = async (event) => {
     event.preventDefault();
@@ -331,7 +341,25 @@ export default function Multiplayer({ onShowNotification }) {
     setJoinRoom(null);
   };
 
+  const handleSendInvite = async (event) => {
+    event.preventDefault();
+    if (!activeSession?.session?.id) {
+      notify('Сначала создайте или откройте сессию', 'error');
+      return;
+    }
 
+    try {
+      setSubmitting(true);
+      await api.multiplayer.inviteByUsername(activeSession.session.id, inviteUsername);
+      setInviteUsername('');
+      await loadInvites();
+      notify('Приглашение отправлено');
+    } catch (error) {
+      notify(error.message || 'Не удалось отправить приглашение', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleDeleteSession = async (sessionId, { confirm = true } = {}) => {
     if (!sessionId) return;
@@ -394,6 +422,7 @@ export default function Multiplayer({ onShowNotification }) {
   const handleInviteAction = async (inviteId, action) => {
     try {
       const result = await api.multiplayer.respondToInvite(inviteId, action);
+      await loadInvites();
       if (action === 'accept' && result.session?.session?.id) {
         setActiveSession(result.session);
         localStorage.setItem(CURRENT_SESSION_KEY, String(result.session.session.id));
@@ -719,6 +748,14 @@ export default function Multiplayer({ onShowNotification }) {
               </div>
 
               <div className="session-toolbar">
+                <form className="invite-inline-form" onSubmit={handleSendInvite}>
+                  <input
+                  value={inviteUsername}
+                  onChange={(event) => setInviteUsername(event.target.value)}
+                  placeholder="Логин участника" />
+                
+                  <button className="btn-outline invite-button" type="submit" disabled={submitting}>Пригласить</button>
+                </form>
                 <div className="session-toolbar-actions">
                   {canStart &&
                 <button className="btn-primary" type="button" onClick={handleStartSession} disabled={submitting}>
@@ -824,7 +861,30 @@ export default function Multiplayer({ onShowNotification }) {
           }
         </section>
 
+        <section className="multiplayer-card">
+          <h2>Приглашения</h2>
+          <div className="invite-list">
+            {pendingInvites.length === 0 ?
+            <p className="empty-note">Сейчас нет приглашений.</p> :
 
+            pendingInvites.map((invite) =>
+            <div key={invite.id} className="invite-item">
+                  <strong>{invite.inviter_username}</strong>
+                  <span>Комната {invite.session_code}</span>
+                  <span>{invite.deck_name}</span>
+                  <div className="invite-actions">
+                    <button className="btn-primary" onClick={() => handleInviteAction(invite.id, 'accept')}>
+                      Принять
+                    </button>
+                    <button className="btn-outline" onClick={() => handleInviteAction(invite.id, 'decline')}>
+                      Отклонить
+                    </button>
+                  </div>
+                </div>
+            )
+            }
+          </div>
+        </section>
 
         <section className="multiplayer-card">
           <h2>Рейтинг</h2>

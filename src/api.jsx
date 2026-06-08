@@ -648,7 +648,23 @@ export const api = {
       return data;
     },
 
-
+    async inviteByUsername(sessionId, username) {
+      const response = await fetch(`${MULTIPLAYER_API_URL}/sessions/${sessionId}/invites`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ username })
+      });
+      const contentType = response.headers.get('content-type') || '';
+      let data;
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(text || 'Server error');
+      }
+      if (!response.ok) throw new Error(data.error || 'Failed to send invite');
+      return data;
+    },
 
     async respondToInvite(inviteId, action) {
       const response = await fetch(`${MULTIPLAYER_API_URL}/invites/${inviteId}/respond`, {
