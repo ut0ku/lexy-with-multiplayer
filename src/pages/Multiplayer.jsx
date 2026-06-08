@@ -761,4 +761,3 @@ if (data?.session) {
     </div>);
 
 }
-

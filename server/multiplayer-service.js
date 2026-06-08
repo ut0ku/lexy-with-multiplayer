@@ -985,6 +985,11 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
                 return res.status(403).json({ error: 'Доступ запрещён' });
             }
 
+            const participants = await loadParticipants(mpPool, sessionId);
+            if (participants.filter((participant) => participant.status === 'active').length < 2) {
+                return res.status(400).json({ error: 'Нужно минимум два участника' });
+            }
+
             await mpPool.query(
                 `UPDATE multiplayer_sessions
                  SET status = 'active', started_at = CURRENT_TIMESTAMP, current_card_index = 0, current_card_started_at = CURRENT_TIMESTAMP

@@ -715,6 +715,12 @@ async function registerMultiplayer({ app, pool, io, authenticateToken, connected
                 return res.status(400).json({ error: 'Сессия уже запущена' });
             }
 
+            const participants = await loadParticipants(pool, sessionId);
+            const activeParticipants = participants.filter((participant) => participant.status === 'active');
+            if (activeParticipants.length < 2) {
+                return res.status(400).json({ error: 'Нужно минимум два участника' });
+            }
+
             await pool.query(
                 `UPDATE multiplayer_sessions
                  SET status = 'active', started_at = CURRENT_TIMESTAMP, current_card_index = 0, current_card_started_at = CURRENT_TIMESTAMP
