@@ -529,22 +529,6 @@ export const api = {
   },
 
   multiplayer: {
-    async getOverview() {
-      const response = await fetch(`${MULTIPLAYER_API_URL}/overview`, {
-        headers: getAuthHeaders()
-      });
-      const contentType = response.headers.get('content-type') || '';
-      let data;
-      if (contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(text || 'Server error');
-      }
-      if (!response.ok) throw new Error(data.error || 'Failed to load multiplayer overview');
-      return data;
-    },
-
     async getInvites() {
       const response = await fetch(`${MULTIPLAYER_API_URL}/invites`, {
         headers: getAuthHeaders()
@@ -593,28 +577,11 @@ export const api = {
         const text = await response.text();
         throw new Error(text || 'Server error');
       }
-      if (!response.ok) throw new Error(data.error || 'Failed to join multiplayer session');
-      return data;
-    },
+if (!response.ok) throw new Error(data.error || 'Failed to join multiplayer session');
+       return data;
+     },
 
-    async deleteSession(sessionId) {
-      const response = await fetch(`${MULTIPLAYER_API_URL}/sessions/${sessionId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      });
-      const contentType = response.headers.get('content-type') || '';
-      let data;
-      if (contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(text || 'Server error');
-      }
-      if (!response.ok) throw new Error(data.error || 'Failed to delete multiplayer session');
-      return data;
-    },
-
-    async leaveSession(sessionId) {
+     async leaveSession(sessionId) {
       const response = await fetch(`${MULTIPLAYER_API_URL}/sessions/${sessionId}/leave`, {
         method: 'POST',
         headers: getAuthHeaders()
@@ -648,23 +615,7 @@ export const api = {
       return data;
     },
 
-    async inviteByUsername(sessionId, username) {
-      const response = await fetch(`${MULTIPLAYER_API_URL}/sessions/${sessionId}/invites`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ username })
-      });
-      const contentType = response.headers.get('content-type') || '';
-      let data;
-      if (contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(text || 'Server error');
-      }
-      if (!response.ok) throw new Error(data.error || 'Failed to send invite');
-      return data;
-    },
+
 
     async respondToInvite(inviteId, action) {
       const response = await fetch(`${MULTIPLAYER_API_URL}/invites/${inviteId}/respond`, {
@@ -719,37 +670,6 @@ export const api = {
       return data;
     },
 
-    async getLeaderboard() {
-      const response = await fetch(`${MULTIPLAYER_API_URL}/leaderboard`, {
-        headers: getAuthHeaders()
-      });
-      const contentType = response.headers.get('content-type') || '';
-      let data;
-      if (contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(text || 'Server error');
-      }
-      if (!response.ok) throw new Error(data.error || 'Failed to load leaderboard');
-      return data;
-    },
-
-    async getHistory() {
-      const response = await fetch(`${MULTIPLAYER_API_URL}/history`, {
-        headers: getAuthHeaders()
-      });
-      const contentType = response.headers.get('content-type') || '';
-      let data;
-      if (contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(text || 'Server error');
-      }
-      if (!response.ok) throw new Error(data.error || 'Failed to load history');
-      return data;
-    }
   }
 };
 
@@ -759,3 +679,4 @@ if (typeof window !== 'undefined') {
 }
 
 export default api;
+

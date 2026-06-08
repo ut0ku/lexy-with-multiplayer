@@ -27,10 +27,10 @@ function getStoredUser() {
 
 export default function Multiplayer({ onShowNotification }) {
   const [loading, setLoading] = useState(true);
-  const [defaultDeckId, setDefaultDeckId] = useState(null);
   const [availableDecks, setAvailableDecks] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
+  const [selectedDeckId, setSelectedDeckId] = useState('');
   const [joinCode, setJoinCode] = useState('');
 
   const [answerValue, setAnswerValue] = useState('');
@@ -61,13 +61,13 @@ export default function Multiplayer({ onShowNotification }) {
       const data = await api.getMyDecks();
       const decks = Array.isArray(data?.decks) ? data.decks : [];
       setAvailableDecks(decks);
-      if (!defaultDeckId && decks.length > 0) {
-        setDefaultDeckId(String(decks[0].id));
+      if (!selectedDeckId && decks.length > 0) {
+        setSelectedDeckId(String(decks[0].id));
       }
     } catch (error) {
       notify(error.message || 'Не удалось загрузить колоды', 'error');
     }
-  }, [notify, defaultDeckId]);
+  }, [notify, selectedDeckId]);
 
   const loadStoredSession = useCallback(async () => {
     const storedSessionId = localStorage.getItem(CURRENT_SESSION_KEY);
@@ -227,14 +227,14 @@ export default function Multiplayer({ onShowNotification }) {
 
   const handleCreateSession = async (event) => {
     event.preventDefault();
-    if (!defaultDeckId) {
-      notify('Нет доступных колод', 'error');
+    if (!selectedDeckId) {
+      notify('Выберите колоду', 'error');
       return;
     }
 
     try {
       setSubmitting(true);
-      const result = await api.multiplayer.createSession(defaultDeckId, 'competitive', 'buttons');
+      const result = await api.multiplayer.createSession(selectedDeckId, 'competitive', 'buttons');
       const sessionPayload = result.session;
       if (sessionPayload?.session?.id) {
         setActiveSession(sessionPayload);
@@ -563,7 +563,18 @@ export default function Multiplayer({ onShowNotification }) {
         <section className="multiplayer-card">
           <h2>Создать комнату</h2>
           <form className="multiplayer-form" onSubmit={handleCreateSession}>
-            <button className="btn-primary" type="submit" disabled={submitting || !defaultDeckId}>
+            <label>
+              Колода
+              <select value={selectedDeckId} onChange={(event) => setSelectedDeckId(event.target.value)} style={{ marginLeft: '4px' }}>
+                <option value="">Выберите колоду</option>
+                {availableDecks.map((deck) =>
+                <option key={deck.id} value={deck.id}>
+                    {deck.name}
+                  </option>
+                )}
+              </select>
+            </label>
+            <button className="btn-primary" type="submit" disabled={submitting}>
               Создать сессию
             </button>
           </form>
