@@ -639,6 +639,7 @@ const handleRoundResult = (payload) => {
               <div className="session-meta">
                 <span>Код: {session?.code}</span>
                 <span>Режим: {session?.mode === 'competitive' ? 'соревновательный' : 'совместный'}</span>
+                <span>Статус: {session?.status}</span>
               </div>
 
               <div className="session-toolbar">
@@ -754,4 +755,5 @@ const handleRoundResult = (payload) => {
     </div>);
 
 }
+
 
