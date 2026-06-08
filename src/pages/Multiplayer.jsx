@@ -401,7 +401,7 @@ const handleSendInvite = async (event) => {
     }
   };
 
-  const handleLeaveLobby = async (sessionId) => {
+const handleLeaveLobby = async (sessionId) => {
     if (!sessionId) return;
 
     const isCreator = String(activeSession?.session?.hostUserId) === String(currentUser?.id);
@@ -409,6 +409,9 @@ const handleSendInvite = async (event) => {
       await handleDeleteSession(sessionId, { confirm: false });
       return;
     }
+
+    const confirmed = window.confirm('Вы действительно хотите выйти из сессии?');
+    if (!confirmed) return;
 
     try {
       setSubmitting(true);
@@ -672,8 +675,9 @@ const handleSendInvite = async (event) => {
   const isHost = String(session?.hostUserId) === String(currentUser?.id);
   const isAdmin = currentUser?.role === 'admin';
 const canStart = isHost && session?.status === 'waiting';
-   const canDelete = (isHost || isAdmin) && session?.status !== 'finished';
-   const historyNeedsScroll = overview.history.length > 3;
+    const canDelete = (isHost || isAdmin) && session?.status !== 'finished';
+    const canLeave = !isHost && session?.status === 'waiting';
+    const historyNeedsScroll = overview.history.length > 3;
    const activeNeedsScroll = overview.activeSessions.length > 3;
 
   return (
@@ -778,9 +782,14 @@ const canStart = isHost && session?.status === 'waiting';
                       Запустить сессию
                     </button>
                 }
-                  {canDelete &&
+{canDelete &&
                 <button className="btn-incorrect" type="button" onClick={() => handleDeleteSession(session.id)} disabled={submitting}>
                       Удалить комнату
+                    </button>
+                }
+                  {canLeave &&
+                <button className="btn-outline" type="button" onClick={() => handleLeaveLobby(session.id)} disabled={submitting}>
+                      Выйти
                     </button>
                 }
                 </div>
