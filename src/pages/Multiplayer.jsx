@@ -27,7 +27,7 @@ function getStoredUser() {
 
 export default function Multiplayer({ onShowNotification }) {
   const [loading, setLoading] = useState(true);
-  const [overview, setOverview] = useState({ leaderboard: [], activeSessions: [], me: {} });
+  const [overview, setOverview] = useState({ leaderboard: [], history: [], activeSessions: [], me: {} });
   const [availableDecks, setAvailableDecks] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
@@ -62,6 +62,7 @@ export default function Multiplayer({ onShowNotification }) {
       const data = await api.multiplayer.getOverview();
       setOverview({
         leaderboard: data.leaderboard || [],
+        history: data.history || [],
         activeSessions: data.activeSessions || [],
         me: data.me || {}
       });
@@ -618,6 +619,7 @@ export default function Multiplayer({ onShowNotification }) {
   const isAdmin = currentUser?.role === 'admin';
   const canStart = isHost && session?.status === 'waiting';
   const canDelete = (isHost || isAdmin) && session?.status !== 'finished';
+  const historyNeedsScroll = overview.history.length > 3;
 
   return (
     <div className="multiplayer-page">
@@ -801,6 +803,32 @@ export default function Multiplayer({ onShowNotification }) {
           <h2>Рейтинг</h2>
         </section>
 
+        <section className="multiplayer-card wide">
+          <h2>История сессий</h2>
+          <div className={`history-list ${historyNeedsScroll ? 'scrollable' : ''}`}>
+            {overview.history.length === 0 ?
+            <p className="empty-note">История пока пуста.</p> :
+
+            overview.history.map((entry) =>
+            <div key={entry.id} className="history-item">
+                  <div>
+                    <strong>{entry.deck_name}</strong>
+                    <p>{entry.mode === 'competitive' ? 'Соревновательный' : 'Совместный'} • {entry.input_mode === 'text' ? 'клавиатура' : 'кнопки'}</p>
+                  </div>
+                  <div className="history-meta">
+                    <span>{new Date(entry.created_at).toLocaleString('ru-RU')}</span>
+                    <span>{entry.status}</span>
+                  </div>
+                  <div className="history-participants">
+                    {(entry.participants || []).map((participant) =>
+                <span key={participant.id}>{participant.username}: {participant.score} очков</span>
+                )}
+                  </div>
+                </div>
+            )
+            }
+          </div>
+        </section>
       </div>
 
       <section className="multiplayer-card wide">
