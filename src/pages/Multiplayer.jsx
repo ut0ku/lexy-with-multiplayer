@@ -347,10 +347,15 @@ export default function Multiplayer({ onShowNotification }) {
     setJoinRoom(null);
   };
 
-  const handleSendInvite = async (event) => {
+const handleSendInvite = async (event) => {
     event.preventDefault();
     if (!activeSession?.session?.id) {
       notify('Сначала создайте или откройте сессию', 'error');
+      return;
+    }
+
+    if (participants.length >= 5) {
+      notify('Комната переполнена (максимум 5 участников)', 'error');
       return;
     }
 
@@ -750,10 +755,12 @@ const canStart = isHost && session?.status === 'waiting';
            {activeSession ?
            <div className="session-panel">
                <div className="session-meta">
-                 <span style={{ cursor: 'pointer' }} onClick={() => { navigator.clipboard.writeText(session?.code || ''); notify('Код скопирован'); }}>Код: {session?.code}</span>
-                 <span>Режим: {session?.mode === 'competitive' ? 'соревновательный' : 'совместный'}</span>
-                 <span>Ответ: {session?.inputMode === 'text' ? 'клавиатура' : 'кнопки'}</span>
-                 <span>Статус: {session?.status}</span>
+<span style={{ cursor: 'pointer' }} onClick={() => { navigator.clipboard.writeText(session?.code || ''); notify('Код скопирован'); }}>Код: {session?.code}</span>
+                  <span>Режим: {session?.mode === 'competitive' ? 'соревновательный' : 'совместный'}</span>
+                  <span>Ответ: {session?.inputMode === 'text' ? 'клавиатура' : 'кнопки'}</span>
+                  <span>Статус: {session?.status}</span>
+                  <span>Участники: {participants.length} / 5</span>
+
                </div>
 
               <div className="session-toolbar">

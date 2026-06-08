@@ -857,6 +857,14 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
                     return res.status(400).json({ error: 'Сессия уже запущена' });
                 }
 
+                const participantCount = await mpPool.query(
+                    'SELECT COUNT(*) AS cnt FROM multiplayer_session_participants WHERE session_id = $1 AND status = $2',
+                    [session.id, 'active']
+                );
+                if (parseInt(participantCount.rows[0].cnt, 10) >= 5) {
+                    return res.status(400).json({ error: 'Комната переполнена (максимум 5 участников)' });
+                }
+
                 await mpPool.query(
                     `INSERT INTO multiplayer_session_participants (session_id, user_id, status)
                      VALUES ($1, $2, 'active')`,
