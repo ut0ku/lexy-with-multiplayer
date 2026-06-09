@@ -1370,10 +1370,84 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
     return { mpPool };
 }
 
+async function emitSessionSnapshot({ mpPool, io, mainPool = null }, sessionId) {
+    const payload = await buildSessionPayload({ mpPool, mainPool }, sessionId);
+    if (!payload) return null;
+    await emitSessionToAudience({ mpPool, io, mainPool }, sessionId, 'multiplayer:sessionUpdated', payload);
+    return payload;
+}
+
+const express = require('express');
+const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
+const path = require('path');
+const { mountSwagger, multiplayerApiSpec } = require('./swagger');
+
+function bootstrapMultiplayerServer() {
+    require('dotenv').config({ path: path.join(__dirname, '.env.multiplayer') });
+
+    const app = express();
+    const server = http.createServer(app);
+    const io = new Server(server, {
+        cors: {
+            origin: true,
+            methods: ['GET', 'POST'],
+            credentials: true
+        }
+    });
+
+    const PORT = process.env.MULTIPLAYER_PORT || process.env.PORT || 3001;
+    const JWT_SECRET = process.env.JWT_SECRET || 'lexy-secret-key-2024';
+
+    app.use(cors({
+        origin: true,
+        credentials: true
+    }));
+    app.use(express.json({ limit: '10mb' }));
+    app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+    mountSwagger(app, '/api-docs', multiplayerApiSpec);
+
+    function authenticateSocket(socket, next) {
+        try {
+            const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
+            if (!token) {
+                return next(new Error('Authentication required'));
+            }
+
+            const payload = jwt.verify(token, JWT_SECRET);
+            socket.data.userId = Number(payload.id);
+            socket.data.username = payload.username;
+            socket.data.role = payload.role;
+            return next();
+        } catch (error) {
+            return next(new Error('Invalid token'));
+        }
+    }
+
+    io.use(authenticateSocket);
+
+    const connectedUsers = new Map();
+
+    registerMultiplayer({ app, io, connectedUsers }).catch((error) => {
+        console.error('Failed to register multiplayer routes:', error);
+    });
+
+    server.listen(PORT, () => {
+        console.log(`Multiplayer service running on http://localhost:${PORT}`);
+    });
+}
+
+if (require.main === module) {
+    bootstrapMultiplayerServer();
+}
+
 module.exports = {
     registerMultiplayer,
     ensureMultiplayerSchema,
     buildSessionPayload,
+    emitSessionSnapshot,
     finalizeSession,
     advanceSessionIfNeeded
 };

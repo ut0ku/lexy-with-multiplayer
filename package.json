@@ -3,7 +3,7 @@
     "start": "concurrently \"npm run start:client\" \"npm run start:server\" \"npm run start:multiplayer\"",
     "start:client": "vite",
     "start:server": "cd server && npm start",
-    "start:multiplayer": "node server/multiplayer-server.js",
+    "start:multiplayer": "node server/multiplayer-service.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
