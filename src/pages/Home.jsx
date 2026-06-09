@@ -168,9 +168,9 @@ export default function Home({ onShowAuth, onLoadPage, onStartStudy, onAddDemoDe
 
       {}
       <section className="features-section">
-        <hgroup className="features-header">
+        <div className="features-header">
           <h2>Почему выбирают Lexy</h2>
-        </hgroup>
+        </div>
         <div className="features-grid">
           <div className="feature-card">
             <div className="feature-icon icon-smart" />
@@ -207,10 +207,10 @@ export default function Home({ onShowAuth, onLoadPage, onStartStudy, onAddDemoDe
 
       {}
       <section className="demo-section" id="demoCards">
-        <hgroup className="demo-header">
+        <div className="demo-header">
           <h2>Попробуйте прямо сейчас</h2>
           <p>Выберите одну из демо колод и начните изучение</p>
-        </hgroup>
+        </div>
         <div className="demo-decks-grid">
           {demoDecks.map((deck) =>
           <div

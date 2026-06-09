@@ -678,7 +678,7 @@ function App() {
             </div>
           </div>
           <div className="footer-right">
-            <p className="footer-copyright">© 2024 Lexy. All rights reserved.</p>
+            <p className="footer-copyright">© 2026 Lexy. All rights reserved.</p>
           </div>
         </div>
       </footer>

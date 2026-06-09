@@ -3244,6 +3244,16 @@ input:focus, textarea:focus {
 }
 
 @media (max-width: 600px) {
+    .landing-page {
+        padding: 16px 12px 120px;
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+    
+    .hero-section {
+        padding: 20px 0 20px;
+    }
+    
     .hero-title {
         font-size: 32px;
     }
@@ -3252,8 +3262,63 @@ input:focus, textarea:focus {
         font-size: 16px;
     }
     
+    .features-section {
+        padding: 40px 0;
+    }
+    
+    .features-header {
+        margin-bottom: 24px;
+    }
+    
     .features-grid {
         grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .demo-section {
+        padding: 40px 12px 60px;
+        margin: 0;
+    }
+    
+    .demo-decks-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        max-width: 100%;
+        padding: 0;
+    }
+    
+    .demo-deck-card {
+        padding: 24px;
+    }
+    
+    .feature-card {
+        padding: 20px;
+    }
+    
+    .feature-card h3 {
+        font-size: 16px;
+    }
+    
+    .feature-card p {
+        font-size: 14px;
+    }
+    
+    .btn-cta {
+        display: inline-flex;
+        margin: 0 auto;
+        max-width: 300px;
+    }
+    
+    .demo-header {
+        margin-bottom: 24px;
+    }
+    
+    .demo-header h2 {
+        font-size: 1.5rem;
+    }
+    
+    .demo-header p {
+        font-size: 0.95rem;
     }
     
     .demo-card-actions {
@@ -3263,5 +3328,14 @@ input:focus, textarea:focus {
     .btn-demo-flip,
     .btn-demo-next {
         width: 100%;
+    }
+    
+    .hero-actions {
+        justify-content: center;
+    }
+    
+    .hero-actions .btn-primary {
+        width: auto;
+        max-width: 300px;
     }
 }
