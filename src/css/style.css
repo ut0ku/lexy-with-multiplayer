@@ -590,6 +590,7 @@ body,
 .active-session-list {
     display: grid;
     gap: 12px;
+    overflow-y: hidden;
 }
 
 .participant-pill {
@@ -685,13 +686,27 @@ body,
     gap: 10px;
 }
 
+.ranking-list.scrollable {
+    max-height: 420px;
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
 .ranking-row {
     display: grid;
-    grid-template-columns: 60px minmax(0, 1fr) 110px 110px 120px;
+    grid-template-columns: 40px 1fr minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 80px;
     align-items: center;
     gap: 10px;
     text-align: left;
     color: var(--text-primary);
+}
+
+.ranking-row > span,
+.ranking-row > strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .active-session-row {

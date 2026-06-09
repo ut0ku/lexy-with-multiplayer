@@ -704,8 +704,9 @@ const handleLeaveLobby = async (sessionId) => {
 const canStart = isHost && session?.status === 'waiting';
     const canDelete = (isHost || isAdmin) && session?.status !== 'finished';
     const canLeave = !isHost && session?.status === 'waiting';
-    const historyNeedsScroll = overview.history.length > 3;
-   const activeNeedsScroll = overview.activeSessions.length > 3;
+const historyNeedsScroll = overview.history.length > 3;
+    const activeNeedsScroll = overview.activeSessions.length > 3;
+    const rankingNeedsScroll = overview.leaderboard.length > 5;
 
   return (
     <div className="multiplayer-page">
@@ -940,7 +941,7 @@ const canStart = isHost && session?.status === 'waiting';
 
         <section className="multiplayer-card">
           <h2>Рейтинг</h2>
-          <div className="ranking-list">
+          <div className={`ranking-list ${rankingNeedsScroll ? 'scrollable' : ''}`}>
             {overview.leaderboard.map((entry) =>
             <button key={entry.user_id} className={`ranking-row ${String(entry.user_id) === String(currentUser?.id) ? 'me' : ''}`} type="button">
                 <span className="ranking-position">#{entry.position}</span>
