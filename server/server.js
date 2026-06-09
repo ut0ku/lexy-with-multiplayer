@@ -468,6 +468,16 @@ app.post('/api/auth/register', async (req, res) => {
         const { name, username, password } = req.body;
         if (!name || !username || !password) return res.status(400).json({ error: 'Заполните все поля' });
 
+        if (typeof name !== 'string' || name.trim().length === 0 || name.length > 50) {
+            return res.status(400).json({ error: 'Имя должно быть от 1 до 50 символов' });
+        }
+        if (typeof username !== 'string' || username.trim().length === 0 || username.length > 50) {
+            return res.status(400).json({ error: 'Логин должен быть от 1 до 50 символов' });
+        }
+        if (typeof password !== 'string' || password.length < 6) {
+            return res.status(400).json({ error: 'Пароль должен быть не менее 6 символов' });
+        }
+
         const existingUser = await pool.query('SELECT id FROM users WHERE username = $1', [username]);
         if (existingUser.rows.length > 0) return res.status(400).json({ error: 'Пользователь уже существует' });
 
@@ -501,6 +511,10 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         if (!username || !password) return res.status(400).json({ error: 'Введите логин и пароль' });
+
+        if (typeof username !== 'string' || typeof password !== 'string') {
+            return res.status(400).json({ error: 'Неверный логин или пароль' });
+        }
 
         const result = await pool.query(
             'SELECT u.id, u.name, u.username, u.password, r.name as role, u.avatar, u.banned_until, u.banned_reason FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.username = $1',

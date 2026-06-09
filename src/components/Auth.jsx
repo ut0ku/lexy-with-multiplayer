@@ -89,6 +89,11 @@ export default function Auth({ onAuthSuccess, onShowNotification }) {
       return;
     }
 
+    if (typeof loginUsername !== 'string' || typeof loginPassword !== 'string') {
+      showNotification('Введите логин и пароль', 'error');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -330,6 +335,19 @@ export default function Auth({ onAuthSuccess, onShowNotification }) {
 
     if (!regName || !regUsername || !regPassword) {
       showNotification('Заполните все поля', 'error');
+      return;
+    }
+
+    if (typeof regName !== 'string' || regName.trim().length === 0 || regName.length > 50) {
+      showNotification('Имя должно быть от 1 до 50 символов', 'error');
+      return;
+    }
+    if (typeof regUsername !== 'string' || regUsername.trim().length === 0 || regUsername.length > 50) {
+      showNotification('Логин должен быть от 1 до 50 символов', 'error');
+      return;
+    }
+    if (typeof regPassword !== 'string' || regPassword.length < 6) {
+      showNotification('Пароль должен быть не менее 6 символов', 'error');
       return;
     }
 
