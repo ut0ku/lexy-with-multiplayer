@@ -188,17 +188,10 @@ body,
         border-bottom-color: transparent;
     }
 
-    .nav-logo {
-        position: static;
-        transform: none;
-        width: auto;
-        text-align: left;
-    }
-
     .nav-buttons {
-        position: static;
-        transform: none;
         gap: 32px;
+        flex: 1;
+        justify-content: center;
     }
 
     .container {
@@ -226,18 +219,15 @@ body,
     -webkit-text-fill-color: transparent;
     background-clip: text;
     animation: gradient-shift 3s ease infinite;
-    width: 60px;
-    text-align: left;
-    position: absolute;
-    left: 20px;
+    flex-shrink: 0;
 }
 
 .nav-buttons {
     display: flex;
-    gap: 32px;
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
+    gap: 24px;
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
 }
 
 .tab-btn {
@@ -290,6 +280,39 @@ body,
     opacity: 0.4;
     cursor: not-allowed;
     pointer-events: none;
+}
+
+@media (max-width: 900px) {
+    .nav-logo {
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+    
+    .nav-buttons {
+        gap: 12px;
+    }
+    
+    .tab-btn {
+        font-size: 14px;
+        padding: 8px 6px;
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 768px) {
+    .nav-logo {
+        font-size: 16px;
+    }
+    
+    .nav-buttons {
+        gap: 8px;
+    }
+    
+    .tab-btn {
+        font-size: 13px;
+        padding: 8px 4px;
+    }
 }
 
 .tab-btn.disabled:hover {
