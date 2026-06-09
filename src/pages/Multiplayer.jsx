@@ -724,7 +724,7 @@ const canStart = isHost && session?.status === 'waiting';
             <label>
               Режим
               <select value={mode} onChange={(event) => setMode(event.target.value)}>
-                <option value="cooperative">Совместный</option>
+                <option value="collaborative">Совместный</option>
                 <option value="competitive">Соревновательный</option>
               </select>
             </label>
