@@ -488,7 +488,9 @@ async function finalizeSession({ mpPool, mainPool = null }, sessionId) {
     );
 
     for (const participant of participants) {
-        const winsDelta = winner && Number(winner.user_id) === Number(participant.user_id) ? 1 : 0;
+        const isCompetitive = session.mode === 'competitive';
+        const winnerUserId = isCompetitive && winner ? winner.user_id : null;
+        const winsDelta = winnerUserId && Number(winnerUserId) === Number(participant.user_id) ? 1 : 0;
         await mpPool.query(
             `INSERT INTO multiplayer_user_stats (
                 user_id, wins, correct_answers, total_answers, points, total_time_ms, sessions_played, updated_at
@@ -506,7 +508,7 @@ async function finalizeSession({ mpPool, mainPool = null }, sessionId) {
                 winsDelta,
                 participant.correct_count,
                 participant.correct_count + participant.incorrect_count,
-                participant.score,
+                isCompetitive ? participant.score : 0,
                 participant.total_time_ms
             ]
         );
