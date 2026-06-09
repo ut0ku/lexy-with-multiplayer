@@ -25,6 +25,164 @@ function getStoredUser() {
   }
 }
 
+const StudySession = ({ currentCard, cardIndex, totalCards, inputMode, onSubmitAnswer, submitting }) => {
+  const [userAnswer, setUserAnswer] = useState('');
+  const [isSwiping, setIsSwiping] = useState(false);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [rotation, setRotation] = useState(0);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [studyNotification, setStudyNotification] = useState(null);
+  const autoSwipedRef = useRef(false);
+
+  const isWritten = inputMode === 'text';
+  const displayText = currentCard?.front || currentCard?.word || '';
+  const correctAnswer = currentCard?.back || currentCard?.translation || '';
+
+  const notifyLocal = (text, type) => {
+    setStudyNotification({ text, type });
+    setTimeout(() => setStudyNotification(null), 1800);
+  };
+
+  const animateAndNext = async (direction, payloadValue) => {
+    if (isLeaving) return;
+    setIsLeaving(true);
+    setIsSwiping(false);
+
+    const offsetDistance = 250;
+    setSwipeOffset(direction === 'right' ? offsetDistance : -offsetDistance);
+    setRotation(direction === 'right' ? 12 : -12);
+
+    try {
+      const result = await onSubmitAnswer(payloadValue);
+      if (result && result.isCorrect) notifyLocal('Правильно!', 'success');else
+      notifyLocal(`Неверно. Правильно: ${correctAnswer}`, 'error');
+    } catch (e) {
+      notifyLocal('Ошибка отправки', 'error');
+    }
+
+    setTimeout(() => {
+      setIsLeaving(false);
+      setSwipeOffset(0);
+      setRotation(0);
+      autoSwipedRef.current = false;
+      setUserAnswer('');
+    }, 500);
+  };
+
+  const handleKnow = () => animateAndNext('right', 'know');
+  const handleDontKnow = () => animateAndNext('left', 'dont_know');
+
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: () => {if (!autoSwipedRef.current && !isLeaving && !isWritten) handleDontKnow();},
+    onSwipedRight: () => {if (!autoSwipedRef.current && !isLeaving && !isWritten) handleKnow();},
+    onSwiping: ({ deltaX }) => {
+      if (!isWritten && !autoSwipedRef.current && !isLeaving) {
+        if (deltaX > 150) {autoSwipedRef.current = true;handleKnow();} else
+        if (deltaX < -150) {autoSwipedRef.current = true;handleDontKnow();} else
+        {setSwipeOffset(deltaX);setRotation(deltaX * 0.1);setIsSwiping(true);}
+      }
+    },
+    onSwiped: () => {if (!isLeaving) {autoSwipedRef.current = false;setIsSwiping(false);setSwipeOffset(0);setRotation(0);}},
+    preventDefaultTouchmoveEvent: true,
+    trackMouse: true,
+    trackTouch: !isWritten
+  });
+
+  const handleCheckAnswer = async () => {
+    try {
+      const result = await onSubmitAnswer(userAnswer);
+      if (result && result.isCorrect) notifyLocal('Правильно!', 'success');else
+      notifyLocal(`Неверно. Правильный ответ: ${correctAnswer}`, 'error');
+    } catch (e) {
+      notifyLocal('Ошибка отправки', 'error');
+    }
+    setUserAnswer('');
+  };
+
+  return (
+    <div className="auth-modal active">
+      <div className="auth-container study-modal" style={{ maxWidth: '600px' }}>
+        <h3>Карточка {cardIndex + 1} / {totalCards}</h3>
+        
+        <div
+          className="study-card"
+          id="studyCard"
+          style={{
+            fontSize: '24px',
+            textAlign: 'center',
+            padding: '40px',
+            margin: '20px 0',
+            background: swipeOffset > 50 ? 'rgba(52, 199, 89, 0.1)' : swipeOffset < -50 ? 'rgba(255, 59, 48, 0.1)' : 'var(--bg-secondary)',
+            borderRadius: '12px',
+            opacity: isLeaving ? 0 : 1,
+            transform: `translate(${swipeOffset}px, ${-Math.abs(swipeOffset) * 0.25}px) rotate(${rotation}deg)`,
+            transition: isSwiping ? 'transform 0.1s ease-out' : 'transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.5s ease',
+            userSelect: 'none',
+            border: swipeOffset > 50 ? '2px solid #34c759' : swipeOffset < -50 ? '2px solid #ff3b30' : '1px solid var(--border)',
+            transformOrigin: 'center',
+            touchAction: 'none'
+          }}
+          {...swipeHandlers}>
+          
+          {displayText}
+        </div>
+
+        {isWritten ?
+        <div style={{ marginTop: '20px' }}>
+            <input
+            type="text"
+            placeholder="Введите перевод..."
+            value={userAnswer}
+            onChange={(e) => setUserAnswer(e.target.value)}
+            style={{ width: '100%', padding: '10px' }}
+            onKeyPress={(e) => e.key === 'Enter' && handleCheckAnswer()} />
+          
+            <button
+            className="btn-primary"
+            onClick={handleCheckAnswer}
+            disabled={submitting || !userAnswer.trim()}
+            style={{ marginTop: '10px', width: '100%' }}>
+            
+              Проверить
+            </button>
+          </div> :
+
+        <div className="study-controls" style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <button className="control-btn left" onClick={handleDontKnow} disabled={isLeaving || submitting}>← Не знаю</button>
+            <button className="control-btn right" onClick={handleKnow} disabled={isLeaving || submitting}>Знаю →</button>
+          </div>
+        }
+
+        <p style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+          {correctAnswer ? 'Ответ сравнивается в реальном времени с сервером' : ''}
+        </p>
+      </div>
+
+      {studyNotification &&
+      <div style={{
+        position: 'fixed',
+        bottom: '40px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: studyNotification.type === 'success' ? '#34c759' : '#ff3b30',
+        color: 'white',
+        padding: '12px 24px',
+        borderRadius: '24px',
+        fontSize: '16px',
+        fontWeight: 'bold',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        zIndex: 9999,
+        maxWidth: '90%',
+        textAlign: 'center',
+        width: 'fit-content',
+        animation: 'slideUpFadeIn 0.3s ease forwards'
+      }}>
+          {studyNotification.text}
+        </div>
+      }
+    </div>);
+
+};
 export default function Multiplayer({ onShowNotification }) {
   const [loading, setLoading] = useState(true);
   const [overview, setOverview] = useState({ leaderboard: [], history: [], activeSessions: [], me: {} });
@@ -508,164 +666,7 @@ const handleLeaveLobby = async (sessionId) => {
   };
 
 
-  const StudySession = ({ currentCard, cardIndex, totalCards, inputMode, onSubmitAnswer, submitting }) => {
-    const [userAnswer, setUserAnswer] = useState('');
-    const [isSwiping, setIsSwiping] = useState(false);
-    const [swipeOffset, setSwipeOffset] = useState(0);
-    const [rotation, setRotation] = useState(0);
-    const [isLeaving, setIsLeaving] = useState(false);
-    const [studyNotification, setStudyNotification] = useState(null);
-    const autoSwipedRef = useRef(false);
 
-    const isWritten = inputMode === 'text';
-    const displayText = currentCard?.front || currentCard?.word || '';
-    const correctAnswer = currentCard?.back || currentCard?.translation || '';
-
-    const notifyLocal = (text, type) => {
-      setStudyNotification({ text, type });
-      setTimeout(() => setStudyNotification(null), 1800);
-    };
-
-    const animateAndNext = async (direction, payloadValue) => {
-      if (isLeaving) return;
-      setIsLeaving(true);
-      setIsSwiping(false);
-
-      const offsetDistance = 250;
-      setSwipeOffset(direction === 'right' ? offsetDistance : -offsetDistance);
-      setRotation(direction === 'right' ? 12 : -12);
-
-      try {
-        const result = await onSubmitAnswer(payloadValue);
-        if (result && result.isCorrect) notifyLocal('Правильно!', 'success');else
-        notifyLocal(`Неверно. Правильно: ${correctAnswer}`, 'error');
-      } catch (e) {
-        notifyLocal('Ошибка отправки', 'error');
-      }
-
-      setTimeout(() => {
-        setIsLeaving(false);
-        setSwipeOffset(0);
-        setRotation(0);
-        autoSwipedRef.current = false;
-        setUserAnswer('');
-      }, 500);
-    };
-
-    const handleKnow = () => animateAndNext('right', 'know');
-    const handleDontKnow = () => animateAndNext('left', 'dont_know');
-
-    const swipeHandlers = useSwipeable({
-      onSwipedLeft: () => {if (!autoSwipedRef.current && !isLeaving && !isWritten) handleDontKnow();},
-      onSwipedRight: () => {if (!autoSwipedRef.current && !isLeaving && !isWritten) handleKnow();},
-      onSwiping: ({ deltaX }) => {
-        if (!isWritten && !autoSwipedRef.current && !isLeaving) {
-          if (deltaX > 150) {autoSwipedRef.current = true;handleKnow();} else
-          if (deltaX < -150) {autoSwipedRef.current = true;handleDontKnow();} else
-          {setSwipeOffset(deltaX);setRotation(deltaX * 0.1);setIsSwiping(true);}
-        }
-      },
-      onSwiped: () => {if (!isLeaving) {autoSwipedRef.current = false;setIsSwiping(false);setSwipeOffset(0);setRotation(0);}},
-      preventDefaultTouchmoveEvent: true,
-      trackMouse: true,
-      trackTouch: !isWritten
-    });
-
-    const handleCheckAnswer = async () => {
-      try {
-        const result = await onSubmitAnswer(userAnswer);
-        if (result && result.isCorrect) notifyLocal('Правильно!', 'success');else
-        notifyLocal(`Неверно. Правильный ответ: ${correctAnswer}`, 'error');
-      } catch (e) {
-        notifyLocal('Ошибка отправки', 'error');
-      }
-      setUserAnswer('');
-    };
-
-    return (
-      <div className="auth-modal active">
-        <div className="auth-container study-modal" style={{ maxWidth: '600px' }}>
-          <h3>Карточка {cardIndex + 1} / {totalCards}</h3>
-          
-          <div
-            className="study-card"
-            id="studyCard"
-            style={{
-              fontSize: '24px',
-              textAlign: 'center',
-              padding: '40px',
-              margin: '20px 0',
-              background: swipeOffset > 50 ? 'rgba(52, 199, 89, 0.1)' : swipeOffset < -50 ? 'rgba(255, 59, 48, 0.1)' : 'var(--bg-secondary)',
-              borderRadius: '12px',
-              opacity: isLeaving ? 0 : 1,
-              transform: `translate(${swipeOffset}px, ${-Math.abs(swipeOffset) * 0.25}px) rotate(${rotation}deg)`,
-              transition: isSwiping ? 'transform 0.1s ease-out' : 'transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.5s ease',
-              userSelect: 'none',
-              border: swipeOffset > 50 ? '2px solid #34c759' : swipeOffset < -50 ? '2px solid #ff3b30' : '1px solid var(--border)',
-              transformOrigin: 'center',
-              touchAction: 'none'
-            }}
-            {...swipeHandlers}>
-            
-            {displayText}
-          </div>
-
-          {isWritten ?
-          <div style={{ marginTop: '20px' }}>
-              <input
-              type="text"
-              placeholder="Введите перевод..."
-              value={userAnswer}
-              onChange={(e) => setUserAnswer(e.target.value)}
-              style={{ width: '100%', padding: '10px' }}
-              onKeyPress={(e) => e.key === 'Enter' && handleCheckAnswer()} />
-            
-              <button
-              className="btn-primary"
-              onClick={handleCheckAnswer}
-              disabled={submitting || !userAnswer.trim()}
-              style={{ marginTop: '10px', width: '100%' }}>
-              
-                Проверить
-              </button>
-            </div> :
-
-          <div className="study-controls" style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              <button className="control-btn left" onClick={handleDontKnow} disabled={isLeaving || submitting}>← Не знаю</button>
-              <button className="control-btn right" onClick={handleKnow} disabled={isLeaving || submitting}>Знаю →</button>
-            </div>
-          }
-
-          <p style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-            {correctAnswer ? 'Ответ сравнивается в реальном времени с сервером' : ''}
-          </p>
-        </div>
-
-        {studyNotification &&
-        <div style={{
-          position: 'fixed',
-          bottom: '40px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: studyNotification.type === 'success' ? '#34c759' : '#ff3b30',
-          color: 'white',
-          padding: '12px 24px',
-          borderRadius: '24px',
-          fontSize: '16px',
-          fontWeight: 'bold',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          zIndex: 9999,
-          maxWidth: '90%',
-          textAlign: 'center',
-          width: 'fit-content',
-          animation: 'slideUpFadeIn 0.3s ease forwards'
-        }}>
-            {studyNotification.text}
-          </div>
-        }
-      </div>);
-
-  };
 
   const myRank = overview.leaderboard.find((entry) => String(entry.user_id) === String(currentUser?.id));
 
