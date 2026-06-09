@@ -33,6 +33,21 @@ const StudySession = ({ currentCard, cardIndex, totalCards, inputMode, onSubmitA
   const [isLeaving, setIsLeaving] = useState(false);
   const [studyNotification, setStudyNotification] = useState(null);
   const autoSwipedRef = useRef(false);
+  const prevCardIdRef = useRef(currentCard?.id ?? cardIndex);
+  const prevCardIndexRef = useRef(cardIndex);
+
+  useEffect(() => {
+    const nextId = currentCard?.id ?? cardIndex;
+    const nextIndex = cardIndex;
+    if (nextId !== prevCardIdRef.current || nextIndex !== prevCardIndexRef.current) {
+      prevCardIdRef.current = nextId;
+      prevCardIndexRef.current = nextIndex;
+      setSwipeOffset(0);
+      setRotation(0);
+      setUserAnswer('');
+      setIsLeaving(false);
+    }
+  }, [currentCard, cardIndex]);
 
   const isWritten = inputMode === 'text';
   const displayText = currentCard?.front || currentCard?.word || '';
@@ -52,21 +67,32 @@ const StudySession = ({ currentCard, cardIndex, totalCards, inputMode, onSubmitA
     setSwipeOffset(direction === 'right' ? offsetDistance : -offsetDistance);
     setRotation(direction === 'right' ? 12 : -12);
 
+    const cardKeyBefore = prevCardIdRef.current;
+    let submitResult = null;
+
     try {
-      const result = await onSubmitAnswer(payloadValue);
-      if (result && result.isCorrect) notifyLocal('Правильно!', 'success');else
-      notifyLocal(`Неверно. Правильно: ${correctAnswer}`, 'error');
+      submitResult = await onSubmitAnswer(payloadValue);
+      if (submitResult && submitResult.isCorrect) notifyLocal('Правильно!', 'success');
+      else notifyLocal(`Неверно. Правильно: ${correctAnswer}`, 'error');
     } catch (e) {
       notifyLocal('Ошибка отправки', 'error');
     }
 
     setTimeout(() => {
-      setIsLeaving(false);
-      setSwipeOffset(0);
-      setRotation(0);
-      autoSwipedRef.current = false;
-      setUserAnswer('');
-    }, 500);
+      const cardChanged = prevCardIdRef.current !== cardKeyBefore;
+      if (cardChanged) {
+        setSwipeOffset(0);
+        setRotation(0);
+        autoSwipedRef.current = false;
+        setUserAnswer('');
+      } else {
+        setIsLeaving(false);
+        setSwipeOffset(0);
+        setRotation(0);
+        autoSwipedRef.current = false;
+        setUserAnswer('');
+      }
+    }, 520);
   };
 
   const handleKnow = () => animateAndNext('right', 'know');
