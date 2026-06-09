@@ -87,6 +87,10 @@ async function ensureMultiplayerSchema(mpPool) {
     `);
 
     await mpPool.query(`
+        ALTER TABLE multiplayer_sessions ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE
+    `);
+
+    await mpPool.query(`
         CREATE TABLE IF NOT EXISTS multiplayer_session_invites (
             id SERIAL PRIMARY KEY,
             session_id INTEGER NOT NULL,
@@ -365,8 +369,11 @@ async function loadAnswers(mpPool, sessionId) {
     if (numericSessionId === null) return [];
 
     const result = await mpPool.query(
-        `SELECT a.*
+        `SELECT a.card_index, a.participant_id, a.answer_text, a.is_correct, a.response_ms,
+                p.user_id, u.username
          FROM multiplayer_session_answers a
+         JOIN multiplayer_session_participants p ON p.id = a.participant_id
+         LEFT JOIN multiplayer_users u ON u.id = p.user_id
          WHERE a.session_id = $1
          ORDER BY a.card_index ASC, a.created_at ASC`,
         [numericSessionId]
@@ -919,12 +926,9 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
                 audience = audience.to(`user_${userId}`);
             }
 
-            await mpPool.query('BEGIN');
+            await finalizeSession({ mpPool, mainPool }, sessionId);
             await mpPool.query('DELETE FROM multiplayer_session_answers WHERE session_id = $1', [sessionId]);
             await mpPool.query('DELETE FROM multiplayer_session_invites WHERE session_id = $1', [sessionId]);
-            await mpPool.query('DELETE FROM multiplayer_session_participants WHERE session_id = $1', [sessionId]);
-            await mpPool.query('DELETE FROM multiplayer_sessions WHERE id = $1', [sessionId]);
-            await mpPool.query('COMMIT');
 
             audience.emit('multiplayer:sessionDeleted', {
                 sessionId,

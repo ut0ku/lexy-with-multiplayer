@@ -641,7 +641,7 @@ async function registerMultiplayer({ app, pool, io, authenticateToken, connected
                 return res.status(403).json({ error: 'Доступ запрещён' });
             }
 
-            await pool.query('DELETE FROM multiplayer_sessions WHERE id = $1', [sessionId]);
+            await pool.query(`UPDATE multiplayer_sessions SET status = 'finished' WHERE id = $1`, [sessionId]);
 
             io.to(createRoomName(sessionId)).emit('multiplayer:sessionDeleted', {
                 sessionId,
