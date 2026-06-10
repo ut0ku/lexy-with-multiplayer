@@ -52,6 +52,9 @@ docker compose up -d
 3. Дождаться запуска всех процессов:
 
 Фронтенд `http://localhost:80`.
+
 Основной сервер `http://localhost:3002`.
+
 Микросервис мультиплеера `http://localhost:3003`.
+
 PostgreSQL `http://localhost:5432`.
