@@ -18,6 +18,7 @@ export default function Profile({ onLogout, onShowNotification, onNavigate }) {
   const [editAvatar, setEditAvatar] = useState('');
   const loadingRef = useRef(false);
 
+  // Update local state from AppState
   const updateProfileDisplay = useCallback(() => {
     const currentUser = window.AppState?.user;
     if (currentUser && JSON.stringify(currentUser) !== JSON.stringify(user)) {
@@ -77,6 +78,7 @@ export default function Profile({ onLogout, onShowNotification, onNavigate }) {
     updateNotificationIcon();
   }, [applyTheme, swapThemeIcons, updateNotificationIcon]);
 
+  // Load user profile from localStorage and API
   const loadProfile = useCallback(async () => {
     if (loadingRef.current) return;
     loadingRef.current = true;
@@ -103,7 +105,7 @@ export default function Profile({ onLogout, onShowNotification, onNavigate }) {
     setIsLightTheme(localUser.theme === 'light');
     setNotificationsDisabled(!(localUser.notifications_enabled !== false));
 
-
+    // Sync with server
     if (localStorage.getItem('lexy_token') && api) {
       try {
         const me = await api.getMe();
@@ -155,6 +157,7 @@ export default function Profile({ onLogout, onShowNotification, onNavigate }) {
 
   useEffect(() => {
 
+    // Apply theme when user.theme changes
     const currentTheme = user.theme || 'dark';
     applyTheme(currentTheme);
     setIsLightTheme(currentTheme === 'light');

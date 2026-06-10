@@ -6,6 +6,7 @@ import { api } from '../api';
 const CURRENT_SESSION_KEY = 'lexy_multiplayer_session_id';
 const MULTIPLAYER_SOCKET_URL = import.meta.env.VITE_MULTIPLAYER_SOCKET_URL || 'http://localhost:3003';
 
+// ms -> sec helper
 function formatDuration(ms) {
   if (!ms && ms !== 0) return '0с';
   const seconds = Math.max(0, Math.floor(ms / 1000));
@@ -36,6 +37,7 @@ const StudySession = ({ currentCard, cardIndex, totalCards, inputMode, onSubmitA
   const prevCardIdRef = useRef(currentCard?.id ?? cardIndex);
   const prevCardIndexRef = useRef(cardIndex);
 
+  // Reset animation state when card changes
   useEffect(() => {
     const nextId = currentCard?.id ?? cardIndex;
     const nextIndex = cardIndex;
@@ -98,6 +100,7 @@ const StudySession = ({ currentCard, cardIndex, totalCards, inputMode, onSubmitA
   const handleKnow = () => animateAndNext('right', 'know');
   const handleDontKnow = () => animateAndNext('left', 'dont_know');
 
+  //only for buttons mode
   const swipeHandlers = useSwipeable({
     onSwipedLeft: () => {if (!autoSwipedRef.current && !isLeaving && !isWritten) handleDontKnow();},
     onSwipedRight: () => {if (!autoSwipedRef.current && !isLeaving && !isWritten) handleKnow();},
@@ -305,6 +308,7 @@ export default function Multiplayer({ onShowNotification }) {
     }
   }, []);
 
+  // Auto refresh session state (2,5s)
   useEffect(() => {
     if (!activeSession?.session?.id) return undefined;
 
@@ -325,6 +329,7 @@ export default function Multiplayer({ onShowNotification }) {
     previousSessionStatusRef.current = currentStatus;
   }, [activeSession?.session?.status]);
 
+  // SocketIO listeners for real time updates
   useEffect(() => {
     const token = localStorage.getItem('lexy_token');
     if (!token) return undefined;

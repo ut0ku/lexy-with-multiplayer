@@ -7,6 +7,7 @@ export default function StudyMode({ deck, onClose, onShowNotification, onToggleF
   const [isComplete, setIsComplete] = useState(false);
   const [studyCards, setStudyCards] = useState(deck.cards || []);
 
+  // Reset session state when deck changes
   useEffect(() => {
     setCurrentCardIndex(0);
     setIsFlipped(false);
@@ -33,7 +34,7 @@ export default function StudyMode({ deck, onClose, onShowNotification, onToggleF
       setIsComplete(true);
     } else {
       setCurrentCardIndex(nextIndex);
-      setIsFlipped(false);
+      setIsFlipped(false); // Reset flip for next card
     }
   }, [currentCardIndex, studyCards.length]);
 

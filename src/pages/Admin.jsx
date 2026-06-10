@@ -94,7 +94,7 @@ export default function Admin({ onShowNotification, onNavigate }) {
   useEffect(() => {
     const userStr = localStorage.getItem('lexy_user');
     const user = userStr ? JSON.parse(userStr) : null;
-
+    // Admin access check
     if (!user || user.role !== 'admin') {
       showNotification('Доступ запрещён', 'error');
       if (onNavigate) onNavigate('home');
@@ -144,6 +144,7 @@ export default function Admin({ onShowNotification, onNavigate }) {
     setBanDuration('1');
   };
 
+  // ban user (duration & reason)
   const confirmBan = async (userId) => {
     console.log('Confirming ban for user', userId, 'with duration', banDuration, 'reason', banReason);
     let payload = {};

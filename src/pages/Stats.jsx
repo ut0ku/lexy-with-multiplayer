@@ -13,6 +13,7 @@ export default function Stats() {
   const resizeTimeoutRef = useRef(null);
 
   const loadStatsFromServer = useCallback(async () => {
+    // Load activity heatmap data
     try {
       const stats = await api.getStats();
 
@@ -28,6 +29,7 @@ export default function Stats() {
       try {
         const activityData = await api.getActivity();
 
+        // Calculate streak
         if (activityData && activityData.activity) {
 
           if (window.AppState) {
@@ -60,6 +62,7 @@ export default function Stats() {
           checkDate.setDate(checkDate.getDate() - offset);
           let checkStr = toDateStr(checkDate);
 
+          // If no activity today, start counting from yesterday
           if (act[checkStr] && act[checkStr] > 0) {
             streakCount++;
             offset++;
@@ -119,7 +122,7 @@ export default function Stats() {
     const currentLearnedWords = window.AppState?.user?.learnedWords || 0;
     setLearnedWords(currentLearnedWords);
 
-
+    // min -> sec
     const currentStudyTime = window.AppState?.user?.studyTime ? Math.floor(window.AppState.user.studyTime / 60) : 0;
     setStudyTime(currentStudyTime);
 
@@ -128,12 +131,13 @@ export default function Stats() {
     setAccuracy(currentAccuracy);
   }, []);
 
+  // GitHub style calendar
   const renderActivityCalendar = useCallback(() => {
 
     const isMobile = window.innerWidth <= 600;
 
 
-
+    // 27 weeks (mobile), 54 (desktop)
     const weeks = isMobile ? 27 : 54;
     const gridCols = `repeat(${weeks}, minmax(${isMobile ? '4px' : '4px'}, 1fr))`;
     const daysInWeek = 7;
@@ -197,7 +201,7 @@ export default function Stats() {
     setCalendarHtml(calendarGridHtml);
   }, []);
 
-
+   // live stats update every sec
   useEffect(() => {
     const interval = setInterval(() => {
       updateStatsDisplay();

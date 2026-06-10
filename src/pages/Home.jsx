@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-
+// demo cards
 const demoQuickCards = [
 { front: 'Hello', back: 'Привет' },
 { front: 'Goodbye', back: 'До свидания' },
@@ -65,6 +65,7 @@ export default function Home({ onShowAuth, onLoadPage, onStartStudy, onAddDemoDe
     setDemoDecks(decks);
   }, []);
 
+  // Reset flip state when card index changes
   const updateQuickCard = useCallback(() => {
     setIsQuickCardFlipped(false);
   }, []);

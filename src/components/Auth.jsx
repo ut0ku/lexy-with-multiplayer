@@ -29,6 +29,7 @@ export default function Auth({ onAuthSuccess, onShowNotification }) {
       localStorage.removeItem('lexy_user');
     }
 
+    // Already logged in - just update UI
     if (token && user && user.username) {
       if (onAuthSuccess) {
         onAuthSuccess('profile');
@@ -41,6 +42,7 @@ export default function Auth({ onAuthSuccess, onShowNotification }) {
 
   const closeAuthModal = () => {
     setIsVisible(false);
+    // Clear form fields
     setLoginUsername('');
     setLoginPassword('');
     setRegName('');
@@ -81,6 +83,7 @@ export default function Auth({ onAuthSuccess, onShowNotification }) {
     }
   };
 
+  // Login handler
   const handleLogin = async (event) => {
     event.preventDefault();
 
@@ -124,6 +127,7 @@ export default function Auth({ onAuthSuccess, onShowNotification }) {
         window.AppState.user = userData;
       }
 
+      // Load user activity data
       try {
         const activityData = await api.getActivity();
         if (activityData && activityData.activity && window.AppState) {
@@ -163,6 +167,7 @@ export default function Auth({ onAuthSuccess, onShowNotification }) {
 
 
       try {
+        // Synchronize local data with server
         const serverData = await api.syncGet();
 
         if (serverData && serverData.decks && serverData.decks.length > 0) {
@@ -211,6 +216,7 @@ export default function Auth({ onAuthSuccess, onShowNotification }) {
               isForgotten: true
             };
 
+            // Convert server decks to AppState format
             window.AppState.userDecks = serverData.decks.map((deck) => {
               const deckCards = serverCards.
               filter((card) => card.deck_id === deck.id).
@@ -333,6 +339,7 @@ export default function Auth({ onAuthSuccess, onShowNotification }) {
   const handleRegister = async (event) => {
     event.preventDefault();
 
+    // Input validation
     if (!regName || !regUsername || !regPassword) {
       showNotification('Заполните все поля', 'error');
       return;
@@ -366,6 +373,7 @@ export default function Auth({ onAuthSuccess, onShowNotification }) {
       }
 
 
+      // Sync local decks to newly created account
       if (window.AppState?.userDecks && window.AppState.userDecks.length > 0) {
         try {
           await api.syncSave(window.AppState.userDecks);
@@ -385,6 +393,7 @@ export default function Auth({ onAuthSuccess, onShowNotification }) {
       }
 
 
+      // Refresh UI components after registration
       setTimeout(() => {
         if (typeof window.refreshMyDecks === 'function') {
           window.refreshMyDecks();
@@ -408,6 +417,7 @@ export default function Auth({ onAuthSuccess, onShowNotification }) {
   };
 
 
+  // Register global methods for external access
   useEffect(() => {
     window.openAuthModal = openAuthModal;
     window.closeAuthModal = closeAuthModal;

@@ -99,6 +99,7 @@ export default function MyDecks({ onShowNotification }) {
       setForgottenCards(normalizedForgotten);
       setForgottenCount(normalizedForgotten.length || 0);
 
+      // Sync to AppState for global access
       if (window.AppState) {
         window.AppState.favoriteDeck = {
           id: 'favorite',
@@ -400,6 +401,7 @@ export default function MyDecks({ onShowNotification }) {
     }
 
 
+    // Record daily activity
     const today = new Date().toISOString().split('T')[0];
     if (window.AppState?.user?.activity) {
       window.AppState.user.activity[today] = (window.AppState.user.activity[today] || 0) + 1;
@@ -923,6 +925,7 @@ export default function MyDecks({ onShowNotification }) {
     const displayText = isWordToTranslation ? currentStudyCard.front || currentStudyCard.word : currentStudyCard.back || currentStudyCard.translation;
     const correctAnswer = isWordToTranslation ? currentStudyCard.back || currentStudyCard.translation : currentStudyCard.front || currentStudyCard.word;
 
+    // Animate card swipe & submit result
     const animateAndNext = (direction, result) => {
       if (isLeaving) return;
       setIsLeaving(true);

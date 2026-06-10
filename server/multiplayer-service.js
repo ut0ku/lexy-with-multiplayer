@@ -15,10 +15,12 @@ function generateSessionCode() {
     return crypto.randomBytes(3).toString('hex').toUpperCase();
 }
 
+// Socket.IO room name format for session broadcasts
 function createRoomName(sessionId) {
     return `multiplayer_session_${sessionId}`;
 }
 
+// Main DB connection
 function createMainPool() {
     return new Pool({
         user: process.env.MAIN_DB_USER || process.env.DB_USER || 'postgres',
@@ -30,6 +32,7 @@ function createMainPool() {
     });
 }
 
+// Multiplayer DB connection
 function createMultiplayerPool() {
     console.log('Multiplayer DB config:', {
         user: process.env.DB_USER,
@@ -403,6 +406,7 @@ async function buildSessionPayload({ mpPool, mainPool = null }, sessionId, viewe
 
     const participants = await loadParticipants(mpPool, sessionId);
     const currentParticipantIds = participants.map((participant) => Number(participant.user_id));
+    // Security: viewer must be host or participant
     if (viewerUserId !== null && Number(session.host_user_id) !== Number(viewerUserId) && !currentParticipantIds.includes(Number(viewerUserId))) {
         return null;
     }
@@ -463,11 +467,13 @@ async function buildSessionPayload({ mpPool, mainPool = null }, sessionId, viewe
     };
 }
 
+// Winner rules: score > correct_count > less total_time_ms
 async function finalizeSession({ mpPool, mainPool = null }, sessionId) {
     const session = await loadSession(mpPool, sessionId);
     if (!session || session.status === 'finished') return session;
 
     const participants = await loadParticipants(mpPool, sessionId);
+    // Cascade tie-breaker
     const winner = session.mode === 'competitive'
         ? participants.reduce((best, current) => {
             if (!best) return current;
@@ -487,6 +493,7 @@ async function finalizeSession({ mpPool, mainPool = null }, sessionId) {
         [sessionId, winner ? winner.user_id : null]
     );
 
+    // Update aggregated stats for each participant
     for (const participant of participants) {
         const isCompetitive = session.mode === 'competitive';
         const winnerUserId = isCompetitive && winner ? winner.user_id : null;
@@ -537,6 +544,7 @@ async function emitSessionToAudience({ mpPool, io, mainPool = null }, sessionId,
     audience.emit(eventName, payload);
 }
 
+// If last card, finalize session instead
 async function advanceSessionIfNeeded(ctx, sessionId) {
     const { mpPool, io, mainPool = null } = ctx;
     const session = await loadSession(mpPool, sessionId);
@@ -559,6 +567,7 @@ async function advanceSessionIfNeeded(ctx, sessionId) {
         [sessionId, nextIndex]
     );
 
+    // Notify all participants about new round
     const payload = await buildSessionPayload({ mpPool, mainPool }, sessionId);
     await emitSessionToAudience(ctx, sessionId, 'multiplayer:sessionUpdated', payload);
     await emitSessionToAudience(ctx, sessionId, 'multiplayer:roundStarted', {
@@ -1184,6 +1193,7 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
             } else {
                 isCorrect = normalizeText(answerText) === 'know';
             }
+            // Calculate score
             const scoreDelta = session.mode === 'competitive'
                 ? (isCorrect ? Math.max(25, 1000 - Math.floor(responseMs / 12)) : 0)
                 : (isCorrect ? 1 : 0);

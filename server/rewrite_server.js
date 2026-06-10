@@ -1,3 +1,4 @@
+// Script rewrites server.js with expanded functionality
 const fs = require('fs');
 const path = require('path');
 
@@ -15,6 +16,7 @@ const multer = require('multer');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Multer config for images
 const upload = multer({ 
     storage: multer.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 }
@@ -141,6 +143,7 @@ async function initDatabase() {
             await pool.query("INSERT INTO roles (name) VALUES ('admin'), ('user') ON CONFLICT DO NOTHING");
         } catch(e) {}
 
+        // Create default admin acc
         const adminExists = await pool.query('SELECT id FROM users WHERE username = $1', ['admin']);
         if (adminExists.rows.length === 0) {
             const hashedPassword = await bcrypt.hash('admin123', 10);
@@ -160,6 +163,7 @@ async function initDatabase() {
 
 initDatabase();
 
+// JWT auth middleware
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -186,6 +190,7 @@ app.post('/api/auth/register', async (req, res) => {
         if (existingUser.rows.length > 0) return res.status(400).json({ error: 'Пользователь уже существует' });
 
         const hashedPassword = await bcrypt.hash(password, 10);
+        // First user becomes admin, others become regular users
         const userCount = await pool.query('SELECT COUNT(*) FROM users');
         const roleName = userCount.rows[0].count === '0' ? 'admin' : 'user';
         

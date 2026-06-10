@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+// prevent crashes
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
@@ -81,6 +82,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'lexy-secret-key-2024';
 const YANDEX_DICT_API_KEY = process.env.YANDEX_DICT_API_KEY || '';
 const YANDEX_DICT_LOOKUP_URL = 'https://dictionary.yandex.net/api/v1/dicservice.json/lookup';
 
+// Web Push VAPID keys for browser notifications
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BCGYOSd3_aY2jVM4OVhEYz6iPHYqsMuBwtUw29Zc-aXF4bT2Qii6PZy8T8gkPmFlKYVxwvSGicRJ0d3vEnmJNuc';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'C0-VtuiKEba2LHtMJ1Qi26EFvmY9gp4bh0SD8FhcuSM';
 
@@ -335,6 +337,7 @@ async function getDeckCardSignature(db, deckId) {
     return JSON.stringify(cards.rows.map((c) => [c.front || '', c.back || '']));
 }
 
+// Yandex Dictionary API integration
 function fetchYandexDictionaryTranslation(text, lang) {
     return new Promise((resolve, reject) => {
         const params = new URLSearchParams({
@@ -360,6 +363,7 @@ function fetchYandexDictionaryTranslation(text, lang) {
                     const parsed = JSON.parse(body);
                     const translations = [];
 
+                    // Extract all translation variants
                     for (const def of parsed.def || []) {
                         for (const tr of def.tr || []) {
                             if (typeof tr.text === 'string' && tr.text.trim()) {
@@ -468,6 +472,7 @@ app.post('/api/auth/register', async (req, res) => {
         const { name, username, password } = req.body;
         if (!name || !username || !password) return res.status(400).json({ error: 'Заполните все поля' });
 
+        // Input validation
         if (typeof name !== 'string' || name.trim().length === 0 || name.length > 50) {
             return res.status(400).json({ error: 'Имя должно быть от 1 до 50 символов' });
         }
@@ -482,6 +487,7 @@ app.post('/api/auth/register', async (req, res) => {
         if (existingUser.rows.length > 0) return res.status(400).json({ error: 'Пользователь уже существует' });
 
         const hashedPassword = await bcrypt.hash(password, 10);
+        // First user becomes admin, others become regular users
         const userCount = await pool.query('SELECT COUNT(*) FROM users');
         const roleName = userCount.rows[0].count === '0' ? 'admin' : 'user';
         
@@ -932,6 +938,7 @@ app.post('/api/decks/:id/add', authenticateToken, async (req, res) => {
             }
         }
 
+        // Create a copy of the public deck
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
@@ -1499,6 +1506,7 @@ cron.schedule('0 0 * * *', async () => {
     }
 });
 
+// Socket.IO connection handling
 const connectedUsers = new Map();
 
 io.on('connection', (socket) => {
@@ -1508,6 +1516,7 @@ io.on('connection', (socket) => {
             const action = typeof payload === 'object' && payload !== null ? payload.action : 'login';
             socket.data.userId = Number(userId);
 
+            // Send welcome message or inactivity reminder
             const pref = await pool.query('SELECT notifications_enabled FROM users WHERE id = $1', [userId]);
             if (pref.rows.length > 0 && pref.rows[0].notifications_enabled === false) {
                 return;

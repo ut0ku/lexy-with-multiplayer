@@ -8,7 +8,7 @@ export default function Library({ onShowNotification, onStartStudy }) {
   const [newDecks, setNewDecks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
-  const loadingRef = useRef(false);
+  const loadingRef = useRef(false); // Prevents duplicate API calls
 
 
   const [showDeckModal, setShowDeckModal] = useState(false);
@@ -45,7 +45,7 @@ export default function Library({ onShowNotification, onStartStudy }) {
       const decks = result.decks || [];
       setPublicDecks(decks);
 
-
+      // Filter decks by category
       const recommended = decks.filter((d) => d.category && d.category.split(',').includes('recommended'));
       const popular = decks.filter((d) => d.category && d.category.split(',').includes('popular'));
       const newDecksFiltered = decks.filter((d) => d.category && d.category.split(',').includes('new'));
@@ -55,7 +55,7 @@ export default function Library({ onShowNotification, onStartStudy }) {
       setNewDecks(newDecksFiltered);
     } catch (error) {
       console.error('Error loading public decks:', error);
-
+      // Fallback to static data from AppState if available
       if (window.AppState?.publicDecks) {
         const staticDecks = window.AppState.publicDecks.map((d) => ({
           id: d.id,
@@ -95,6 +95,7 @@ export default function Library({ onShowNotification, onStartStudy }) {
     };
   }, [loadPublicDecksFromServer]);
 
+  // Admin-only action buttons
   const getAdminButtons = (deck) => {
     if (user && user.role === 'admin') {
       return (
@@ -128,11 +129,13 @@ export default function Library({ onShowNotification, onStartStudy }) {
       if (!staticDeck) return;
 
 
+      // Registered user: use API
       if (window.AppState?.user?.isRegistered) {
         try {
           const result = await api.addPublicDeck(staticDeck.id);
           if (result && result.deck) {
             const serverDeck = result.deck;
+            // Convert server card format to client format
             const cards = (serverDeck.cards || []).map((card) => ({
               id: card.id,
               word: card.front,
@@ -173,13 +176,14 @@ export default function Library({ onShowNotification, onStartStudy }) {
       }
 
 
-
+      // Offline or non-registered: add to local AppState
       const existingDeck = window.AppState?.userDecks?.find((d) => d.source === 'public' && d.name === staticDeck.name);
       if (existingDeck) {
         showNotification('Колода уже добавлена', 'error');
         return;
       }
 
+      // max 10 deck creations / hour
       if (!canCreateDeck()) {
         showNotification('Слишком много созданий колод. Подождите час', 'error');
         return;
@@ -321,6 +325,7 @@ export default function Library({ onShowNotification, onStartStudy }) {
     showNotification(`Колода добавлена в Мои колоды с ${cards.length} картами`);
   };
 
+  // Rate limiter
   const canCreateDeck = () => {
     const createTimes = window.AppState?.deckCreateTimes || [];
     const oneHourAgo = Date.now() - 3600000;
@@ -458,6 +463,7 @@ export default function Library({ onShowNotification, onStartStudy }) {
     }
   };
 
+  // Create deck with gradient / custom image
   const renderDeckGrid = (decks, gradientClass = 'accent') => {
     if (decks.length === 0) {
       return <p style={{ color: 'var(--text-secondary)' }}>Пока нет колод</p>;
