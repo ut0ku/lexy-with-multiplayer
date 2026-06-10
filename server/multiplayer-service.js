@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const fetch = global.fetch || require('node-fetch');
 
+const MAIN_API_URL = process.env.MAIN_API_URL || 'http://localhost:3002';
+
 function normalizeText(value) {
     return (value || '')
         .toString()
@@ -165,7 +167,7 @@ async function ensureMultiplayerSchema(mpPool) {
 
         async function syncUser(mpPool, userId, jwtToken) {
             try {
-                const response = await fetch(`http://localhost:3002/api/auth/me`, {
+                const response = await fetch(`${MAIN_API_URL}/api/auth/me`, {
                     headers: { 'Authorization': `Bearer ${jwtToken}` }
                 });
                 if (!response.ok) {
@@ -198,10 +200,17 @@ async function ensureMultiplayerSchema(mpPool) {
 
         async function findUserByUsername(username, jwtToken) {
             try {
-                const response = await fetch(`http://localhost:3002/api/internal/users/search?username=${encodeURIComponent(username)}`, {
+                const normalizedUsername = (username || '').toString().trim().toLowerCase();
+                console.log(`findUserByUsername: looking for '${normalizedUsername}' at ${MAIN_API_URL}/internal/users/search, token present: ${!!jwtToken}`);
+                const response = await fetch(`${MAIN_API_URL}/api/internal/users/search?username=${encodeURIComponent(normalizedUsername)}`, {
                     headers: { 'Authorization': `Bearer ${jwtToken}` }
                 });
-                if (!response.ok) throw new Error('User not found');
+                console.log(`findUserByUsername: response status ${response.status} for username '${normalizedUsername}'`);
+                if (!response.ok) {
+                    const text = await response.text();
+                    console.log(`findUserByUsername: response text: ${text}`);
+                    throw new Error('User not found');
+                }
                 return await response.json();
             } catch (error) {
                 console.error('Error finding user:', error);
@@ -212,7 +221,7 @@ async function ensureMultiplayerSchema(mpPool) {
         async function syncDeck(mpPool, deckId, jwtToken) {
             console.log('Syncing deck:', deckId, 'for multiplayer');
             try {
-                const response = await fetch(`http://localhost:3002/api/decks/${deckId}`, {
+                const response = await fetch(`${MAIN_API_URL}/api/decks/${deckId}`, {
                     headers: { 'Authorization': `Bearer ${jwtToken}` }
                 });
                 if (!response.ok) {
@@ -236,7 +245,7 @@ async function ensureMultiplayerSchema(mpPool) {
                         synced_at = CURRENT_TIMESTAMP
                 `, [deck.id, deck.name]);
 
-                const cardsResponse = await fetch(`http://localhost:3002/api/decks/${deckId}/cards`, {
+                const cardsResponse = await fetch(`${MAIN_API_URL}/api/decks/${deckId}/cards`, {
                     headers: { 'Authorization': `Bearer ${jwtToken}` }
                 });
                 if (cardsResponse.ok) {
@@ -1001,12 +1010,15 @@ async function registerMultiplayer({ app, io, connectedUsers = new Map() }) {
         try {
             const sessionId = Number(req.params.id);
             const username = (req.body.username || '').toString().trim();
+            const authHeader = req.headers.authorization || '';
+            const token = authHeader.split(' ')[1];
+            console.log(`invite request: sessionId=${sessionId}, username='${username}', token present=${!!token}`);
             const session = await loadSession(mpPool, sessionId);
             if (!session || Number(session.host_user_id) !== Number(req.user.id)) {
                 return res.status(403).json({ error: 'Доступ запрещён' });
             }
 
-            const targetUser = await findUserByUsername(username, req.headers.authorization.split(' ')[1]);
+            const targetUser = await findUserByUsername(username, token);
             if (!targetUser) {
                 return res.status(404).json({ error: 'Пользователь не найден' });
             }

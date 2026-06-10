@@ -1302,7 +1302,8 @@ app.get('/api/internal/users/search', authenticateToken, async (req, res) => {
         const { username } = req.query;
         if (!username) return res.status(400).json({ error: 'Username required' });
 
-        const result = await pool.query('SELECT id, username, name, avatar FROM users WHERE username = $1', [username]);
+        const normalizedUsername = username.toString().trim().toLowerCase();
+        const result = await pool.query('SELECT id, username, name, avatar FROM users WHERE LOWER(username) = $1', [normalizedUsername]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
 
         res.json(result.rows[0]);
@@ -1562,3 +1563,5 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
+
+app.get('/api/health', (_, res) => res.json({ ok: true }));

@@ -1,0 +1,20 @@
+FROM node:20-alpine
+WORKDIR /app
+
+# Frontend dependencies
+COPY package*.json ./
+RUN npm ci
+
+# Server dependencies
+COPY server/package*.json ./server/
+WORKDIR /app/server
+RUN rm -rf node_modules && npm ci
+WORKDIR /app
+
+# Copy source code
+COPY server ./server
+COPY vite.config.js ./
+COPY index.html ./
+
+EXPOSE 3002
+CMD ["node", "server/server.js"]

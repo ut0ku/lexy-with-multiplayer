@@ -1,0 +1,79 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: lexy
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lexy"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    environment:
+      PORT: 3002
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: lexy
+      JWT_SECRET: lexy-secret-key-2024
+      VAPID_PUBLIC_KEY: BCGYOSd3_aY2jVM4OVhEYz6iPHYqsMuBwtUw29Zc-aXF4bT2Qii6PZy8T8gkPmFlKYVxwvSGicRJ0d3vEnmJNuc
+      VAPID_PRIVATE_KEY: C0-VtuiKEba2LHtMJ1Qi26EFvmY9gp4bh0SD8FhcuSM
+      YANDEX_DICT_API_KEY: ${YANDEX_DICT_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3002:3002"
+    expose:
+      - "3002"
+
+  multiplayer:
+    build:
+      context: .
+      dockerfile: Dockerfile.multiplayer
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: multiplayer
+      MAIN_DB_HOST: postgres
+      MAIN_DB_PORT: 5432
+      MAIN_DB_USER: postgres
+      MAIN_DB_PASSWORD: postgres
+      MAIN_DB_NAME: lexy
+      JWT_SECRET: lexy-secret-key-2024
+      MAIN_API_URL: http://server:3002
+      MULTIPLAYER_PORT: 3003
+    depends_on:
+      postgres:
+        condition: service_healthy
+      server:
+        condition: service_started
+    ports:
+      - "3003:3003"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+      - multiplayer
+
+volumes:
+  postgres_data:
